@@ -8,7 +8,7 @@ import {
   BarChart2, 
   Menu, 
   X,
-  Football
+  Flag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -54,7 +54,7 @@ export const NavBar = () => {
               whileHover={{ rotate: 360 }}
               transition={{ duration: 0.5 }}
             >
-              <Football size={28} className="text-primary" />
+              <Flag size={28} className="text-primary" />
             </motion.div>
             <motion.span 
               initial={{ opacity: 0, x: -10 }}
