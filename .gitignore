@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+/mi_entorno
+backend/__pycache__/main.cpython-311.pyc
