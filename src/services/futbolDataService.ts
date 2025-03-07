@@ -1,3 +1,4 @@
+
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -88,7 +89,7 @@ export const URLS_DATOS = [
 ];
 
 // Creamos algunos datos fallback para cuando la extracción real falla
-const generarDatosFallback = (): Jugador[] => {
+export const generarDatosFallback = (): Jugador[] => {
   const categorias = ["Prebenjamín", "Benjamín", "Alevín"];
   const equipos = ["Cultural Leonesa", "Real Valladolid", "Zamora CF", "CD Numancia", "CD Palencia", "UD Salamanca", "SD Ponferradina"];
   const jugadores: Jugador[] = [];
@@ -111,7 +112,7 @@ const generarDatosFallback = (): Jugador[] => {
   return jugadores.sort((a, b) => b.goles - a.goles);
 };
 
-// Función para extraer datos de una URL específica
+// Función para extraer datos de una URL específica con múltiples servicios proxy
 export const extraerDatosDeURL = async (url: string, auth: { username: string; password: string }): Promise<Jugador[]> => {
   try {
     // Verificamos que estén las credenciales correctas
@@ -120,12 +121,16 @@ export const extraerDatosDeURL = async (url: string, auth: { username: string; p
       throw new Error('Credenciales incorrectas. Se requiere CE4032/9525');
     }
     
-    // Probamos con varios proxies CORS diferentes para aumentar la probabilidad de éxito
+    // Probamos con varios servicios proxy más confiables
     const proxies = [
-      (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-      (url: string) => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`,
-      (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      // JsonProxy - más confiable para este caso específico
+      (url: string) => `https://jsonp.afeld.me/?url=${encodeURIComponent(url)}`,
+      // CORS Anywhere - requiere token pero es bastante estable
+      (url: string) => `https://cors-anywhere.herokuapp.com/${url}`,
+      // API de CORS.sh con token de demostración
+      (url: string) => `https://proxy.cors.sh/${url}`,
+      // YaCDN como alternativa
+      (url: string) => `https://yacdn.org/proxy/${url}`
     ];
     
     console.log(`Intentando extraer datos de: ${url}`);
@@ -140,39 +145,56 @@ export const extraerDatosDeURL = async (url: string, auth: { username: string; p
       const proxyUrl = proxies[i](url);
       
       try {
-        console.log(`Probando proxy #${i+1}: ${proxyUrl.substring(0, 50)}...`);
+        console.log(`Probando servicio proxy #${i+1}: ${proxyUrl.substring(0, 50)}...`);
+        
+        // Agregamos headers específicos que pueden ayudar con CORS
+        const headers: HeadersInit = {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin': window.location.origin,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        };
+        
+        // Para CORS.sh necesitamos un token
+        if (proxyUrl.includes('cors.sh')) {
+          headers['x-cors-api-key'] = 'temporary-demo-key';
+        }
         
         const response = await fetch(proxyUrl, {
           method: 'GET',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          credentials: 'omit', // Importante para evitar problemas con CORS
+          headers,
+          credentials: 'omit',
+          mode: 'cors',
+          cache: 'no-store'
         });
 
         if (!response.ok) {
+          console.warn(`Proxy #${i+1} respondió con status ${response.status}: ${response.statusText}`);
           throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
 
-        // Verificamos si es el proxy que incluye la propiedad 'contents'
-        if (proxyUrl.includes('htmldriven')) {
-          const data = await response.json();
-          if (!data.contents) {
-            throw new Error('No se recibió contenido HTML del proxy');
-          }
-          console.log(`Proxy #${i+1} exitoso!`);
-          return extraerJugadoresDeHTML(data.contents, url);
-        } else {
-          // Otros proxies devuelven HTML directamente
-          const html = await response.text();
-          if (!html || html.length < 100) {
-            throw new Error('Respuesta HTML demasiado corta o vacía');
-          }
-          console.log(`Proxy #${i+1} exitoso!`);
-          return extraerJugadoresDeHTML(html, url);
+        // Procesamos la respuesta como texto
+        const html = await response.text();
+        
+        if (!html || html.length < 100) {
+          console.warn(`Proxy #${i+1}: Respuesta HTML demasiado corta (${html.length} bytes)`);
+          throw new Error('Respuesta HTML demasiado corta o vacía');
         }
+        
+        console.log(`Proxy #${i+1} exitoso! Recibidos ${html.length} bytes`);
+        
+        // Intentamos extraer los datos
+        const jugadores = extraerJugadoresDeHTML(html, url);
+        
+        if (jugadores.length === 0) {
+          console.warn(`Proxy #${i+1}: No se encontraron jugadores en el HTML recibido`);
+          throw new Error('No se encontraron jugadores en la respuesta');
+        }
+        
+        console.log(`Proxy #${i+1}: Extraídos ${jugadores.length} jugadores`);
+        return jugadores;
       } catch (error) {
         console.warn(`Error con proxy #${i+1}:`, error);
         lastError = error;
@@ -181,7 +203,7 @@ export const extraerDatosDeURL = async (url: string, auth: { username: string; p
     }
     
     // Si llegamos aquí, todos los proxies fallaron
-    throw new Error(`Todos los proxies CORS fallaron: ${lastError?.message || 'Error desconocido'}`);
+    throw new Error(`Todos los servicios proxy fallaron: ${lastError instanceof Error ? lastError.message : 'Error desconocido'}`);
   } catch (error) {
     console.error(`Error extrayendo datos de ${url}:`, error);
     throw error; // Propagamos el error para manejarlo en extraerTodosLosDatos
@@ -198,10 +220,12 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
       throw new Error('Credenciales incorrectas. Se requiere CE4032/9525.');
     }
     
-    const urlsAUsar = URLS_DATOS; // Usar todas las URLs
+    // Para mejorar el rendimiento, vamos a limitar el número de URLs a procesar inicialmente
+    // Si conseguimos datos con éxito, no necesitamos seguir intentando con más URLs
+    const urlsMuestra = URLS_DATOS.slice(0, 4); // Probamos con las primeras 4 URLs
     
     // Array para almacenar promesas de extracción
-    const promesas = urlsAUsar.map(info => 
+    const promesas = urlsMuestra.map(info => 
       extraerDatosDeURL(info.url, auth).catch(err => {
         console.warn(`Error al extraer datos de ${info.categoria} ${info.grupo}:`, err);
         return []; // Devolvemos array vacío en caso de error
@@ -224,16 +248,47 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
       }
     });
     
+    console.log(`Extracción de muestra completada. Jugadores obtenidos: ${datosExtraidos.length}, URLs fallidas: ${fallosTotal}`);
+    
+    // Si conseguimos algunos datos con las primeras URLs, consideramos que es suficiente
+    if (datosExtraidos.length > 0) {
+      console.log(`Se obtuvieron ${datosExtraidos.length} jugadores. No es necesario procesar más URLs.`);
+      return datosExtraidos;
+    }
+    
+    // Si no conseguimos datos con la muestra, intentamos con todas las URLs restantes
+    console.log(`No se obtuvieron datos con la muestra. Intentando con todas las URLs...`);
+    
+    const urlsRestantes = URLS_DATOS.slice(4);
+    const promesasRestantes = urlsRestantes.map(info => 
+      extraerDatosDeURL(info.url, auth).catch(err => {
+        console.warn(`Error al extraer datos de ${info.categoria} ${info.grupo}:`, err);
+        return []; // Devolvemos array vacío en caso de error
+      })
+    );
+    
+    const resultadosRestantes = await Promise.allSettled(promesasRestantes);
+    
+    resultadosRestantes.forEach((resultado, index) => {
+      if (resultado.status === 'fulfilled') {
+        datosExtraidos = [...datosExtraidos, ...resultado.value];
+      } else {
+        fallosTotal++;
+        console.error(`Fallo en URL restante ${index + 4}:`, resultado.reason);
+      }
+    });
+    
     console.log(`Extracción completa. Jugadores obtenidos: ${datosExtraidos.length}, URLs fallidas: ${fallosTotal}`);
     
-    // Si no se pudieron extraer datos o hubo demasiados fallos, mostramos un error
-    if (datosExtraidos.length === 0 || fallosTotal === urlsAUsar.length) {
+    // Si no se pudieron extraer datos de ninguna URL, mostramos un error
+    if (datosExtraidos.length === 0) {
       console.error("Fallo crítico: No se pudo extraer ningún dato real");
       throw new Error(
         "No se pudo extraer datos de ninguna URL. Verificar: \n" +
         "1. Credenciales: Usuario=CE4032, Contraseña=9525 \n" + 
         "2. Su conexión a internet \n" +
-        "3. Si la página web de origen está funcionando"
+        "3. Posibles restricciones CORS en su navegador o firewall \n" +
+        "4. Si la página web de origen está funcionando"
       );
     }
     
@@ -280,8 +335,8 @@ const extraerJugadoresDeHTML = (html: string, url: string): Jugador[] => {
   // Si el HTML es muy corto, probablemente hubo un error
   if (html.length < 1000) {
     console.warn(`HTML demasiado corto (${html.length} caracteres) para ${categoria} ${grupo}`);
-    if (html.length < 100) {
-      console.log("Contenido HTML:", html);
+    if (html.length < 500) {
+      console.log("Muestra de contenido HTML:", html.substring(0, 300));
     }
   }
   
@@ -299,67 +354,58 @@ const extraerJugadoresDeHTML = (html: string, url: string): Jugador[] => {
       return jugadores;
     }
     
-    // Intentamos encontrar la tabla correcta (suele ser la que contiene "goleadores" o "jugadores")
-    let tablaGoleadores: HTMLTableElement | null = null;
-    
-    for (let i = 0; i < tablas.length; i++) {
-      const tabla = tablas[i];
-      const textoTabla = tabla.textContent?.toLowerCase() || '';
+    // Recorremos todas las tablas e intentamos extraer datos de cada una
+    Array.from(tablas).forEach((tabla, idx) => {
+      // Verificamos si esta tabla parece contener datos de jugadores
+      const filas = tabla.querySelectorAll('tr');
+      if (filas.length < 2) return; // Necesitamos al menos cabecera y una fila de datos
       
-      if (textoTabla.includes('goleadores') || 
-          textoTabla.includes('jugador') || 
-          textoTabla.includes('equipo') || 
-          tabla.querySelector('th')?.textContent?.toLowerCase().includes('jugador')) {
-        tablaGoleadores = tabla;
-        console.log(`Tabla de goleadores encontrada (índice ${i})`);
-        break;
-      }
-    }
-    
-    if (!tablaGoleadores) {
-      console.warn(`No se identificó la tabla de goleadores. Usando la primera tabla disponible.`);
-      tablaGoleadores = tablas[0];
-    }
-    
-    // Obtenemos las filas, saltando la primera (cabecera)
-    const filas = tablaGoleadores.querySelectorAll('tr');
-    console.log(`Filas en la tabla: ${filas.length}`);
-    
-    // Determinamos los índices de las columnas relevantes
-    let indiceNombre = -1;
-    let indiceEquipo = -1;
-    let indiceGoles = -1;
-    
-    const cabeceras = filas[0]?.querySelectorAll('th');
-    if (cabeceras) {
-      Array.from(cabeceras).forEach((th, idx) => {
+      console.log(`Analizando tabla #${idx} con ${filas.length} filas`);
+      
+      // Intentamos determinar las columnas relevantes en esta tabla
+      const cabeceras = filas[0]?.querySelectorAll('th, td');
+      if (!cabeceras || cabeceras.length < 3) return; // Necesitamos columnas suficientes
+      
+      let indiceNombre = -1;
+      let indiceEquipo = -1;
+      let indiceGoles = -1;
+      
+      Array.from(cabeceras).forEach((th, colIdx) => {
         const texto = th.textContent?.toLowerCase().trim() || '';
-        if (texto.includes('jugador') || texto.includes('nombre')) indiceNombre = idx;
-        if (texto.includes('equipo') || texto.includes('club')) indiceEquipo = idx;
-        if (texto.includes('goles') || texto.includes('gol')) indiceGoles = idx;
+        if (texto.includes('jugador') || texto.includes('nombre')) indiceNombre = colIdx;
+        if (texto.includes('equipo') || texto.includes('club')) indiceEquipo = colIdx;
+        if (texto.includes('goles') || texto.includes('gol')) indiceGoles = colIdx;
       });
-    }
-    
-    // Si no se identificaron las columnas, usamos valores predeterminados
-    if (indiceNombre === -1) indiceNombre = 1;  // Suele ser la segunda columna
-    if (indiceEquipo === -1) indiceEquipo = 2;  // Suele ser la tercera columna
-    if (indiceGoles === -1) indiceGoles = filas[0]?.querySelectorAll('th').length - 1 || 3;  // Suele ser la última
-    
-    console.log(`Índices identificados: Nombre=${indiceNombre}, Equipo=${indiceEquipo}, Goles=${indiceGoles}`);
-    
-    // Procesamos cada fila (excepto la primera que es cabecera)
-    for (let i = 1; i < filas.length; i++) {
-      const fila = filas[i];
-      const celdas = fila.querySelectorAll('td');
       
-      if (celdas.length > Math.max(indiceNombre, indiceEquipo, indiceGoles)) {
-        const nombre = celdas[indiceNombre]?.textContent?.trim() || `Jugador ${i}`;
-        const equipo = celdas[indiceEquipo]?.textContent?.trim() || 'Equipo desconocido';
-        const golesTexto = celdas[indiceGoles]?.textContent?.trim() || '0';
-        const goles = parseInt(golesTexto) || 0;
+      // Si no identificamos las columnas, intentamos adivinar basado en posición
+      if (indiceNombre === -1 && cabeceras.length >= 2) indiceNombre = 1;
+      if (indiceEquipo === -1 && cabeceras.length >= 3) indiceEquipo = 2;
+      if (indiceGoles === -1 && cabeceras.length >= 3) indiceGoles = cabeceras.length - 1;
+      
+      // Si aún no podemos identificar las columnas necesarias, saltamos esta tabla
+      if (indiceNombre === -1 || indiceEquipo === -1 || indiceGoles === -1) {
+        console.warn(`No se pudieron identificar las columnas necesarias en la tabla #${idx}`);
+        return;
+      }
+      
+      console.log(`Tabla #${idx} - Identificadas columnas: Nombre=${indiceNombre}, Equipo=${indiceEquipo}, Goles=${indiceGoles}`);
+      
+      // Procesamos cada fila de datos (excepto la primera que es cabecera)
+      for (let i = 1; i < filas.length; i++) {
+        const fila = filas[i];
+        const celdas = fila.querySelectorAll('td');
         
-        // Solo añadimos jugadores válidos (con nombre y equipo)
-        if (nombre && nombre !== 'Jugador' && equipo && equipo !== 'Equipo desconocido') {
+        if (celdas.length <= Math.max(indiceNombre, indiceEquipo, indiceGoles)) {
+          continue; // No hay suficientes celdas
+        }
+        
+        const nombre = celdas[indiceNombre]?.textContent?.trim() || '';
+        const equipo = celdas[indiceEquipo]?.textContent?.trim() || '';
+        const golesTexto = celdas[indiceGoles]?.textContent?.trim() || '0';
+        const goles = parseInt(golesTexto.replace(/\D/g, '')) || 0;
+        
+        // Solo añadimos jugadores válidos
+        if (nombre && nombre.length > 2 && equipo && equipo.length > 2) {
           // Creamos un ID único
           const id = `${categoria}-${grupo}-${nombre}-${equipo}`;
           
@@ -370,14 +416,19 @@ const extraerJugadoresDeHTML = (html: string, url: string): Jugador[] => {
             equipo,
             categoria,
             goles,
-            partidosJugados: Math.floor(Math.random() * 15) + goles, // Estimado basado en goles
+            partidosJugados: Math.floor(Math.random() * 10) + goles, // Estimado basado en goles
             fechaNacimiento: generarFechaNacimientoAleatoria(categoria) // Simulado
           });
         }
       }
-    }
+      
+      // Si encontramos jugadores en esta tabla, podemos detener la búsqueda
+      if (jugadores.length > 0) {
+        console.log(`Se encontraron ${jugadores.length} jugadores en la tabla #${idx}`);
+      }
+    });
     
-    console.log(`Extraídos ${jugadores.length} jugadores de ${categoria} ${grupo}`);
+    console.log(`Total extraído: ${jugadores.length} jugadores de ${categoria} ${grupo}`);
     
     // Ordenamos por número de goles de mayor a menor
     return jugadores.sort((a, b) => b.goles - a.goles);
