@@ -2,13 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Jugador } from './futbolDataService';
 
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Supabase credentials are missing. Please connect to Supabase in Lovable and set up your project.');
-}
+// Initialize Supabase client with the actual project URL and key from environment
+const supabaseUrl = 'https://fqsdisrsrqmizuadvobe.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxc2Rpc3JzcnFtaXp1YWR2b2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzOTAzMjEsImV4cCI6MjA1Njk2NjMyMX0.gWWsLa_l3Xw3vhn06KDKLx0ot3BlcWi0PQ9gpb-jKCs';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 

@@ -25,10 +25,10 @@ const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) =
           <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
             <p className="font-semibold flex items-center">
               <Database className="h-4 w-4 mr-1" /> 
-              Conexión a Supabase requerida
+              Ya estás conectado a Supabase
             </p>
             <p className="text-xs mt-1">
-              Conecta este proyecto a Supabase haciendo clic en el botón "Supabase" en la parte superior derecha de la interfaz de Lovable.
+              Ahora es necesario crear la tabla para almacenar los datos. Por favor, ejecuta la aplicación del backend en Python para crear la primera carga de datos.
             </p>
           </div>
         )}
@@ -36,7 +36,7 @@ const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) =
         {!backendDisponible && (
           <Badge variant="outline" className="ml-2 bg-yellow-100 self-start">
             <WifiOff className="h-3 w-3 mr-1" />
-            Backend no disponible
+            Backend no disponible - Ejecuta "uvicorn main:app --reload" en la carpeta backend
           </Badge>
         )}
       </AlertDescription>

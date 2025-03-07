@@ -19,7 +19,8 @@ const Footer = () => {
           </div>
         </div>
         <div className="mt-4 text-center text-xs text-slate-500">
-          <p>Para utilizar esta aplicación, debes conectar el proyecto a Supabase a través de la integración de Lovable.</p>
+          <p>Supabase está conectado. Ahora necesitas iniciar el backend Python para cargar los datos.</p>
+          <p className="font-mono mt-1 bg-slate-800 p-1 rounded">cd backend && uvicorn main:app --reload</p>
         </div>
       </div>
     </footer>
