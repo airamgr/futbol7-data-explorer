@@ -15,6 +15,12 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Credenciales por defecto - las que sabemos que funcionan
+const DEFAULT_CREDENTIALS = {
+  username: 'CE4032',
+  password: '9525'
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
@@ -29,29 +35,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (storedAuth) {
       try {
-        const { username } = JSON.parse(storedAuth);
+        const { username, password } = JSON.parse(storedAuth);
+        
+        // Verificamos si son las credenciales correctas
+        if (username !== DEFAULT_CREDENTIALS.username || password !== DEFAULT_CREDENTIALS.password) {
+          console.warn('Credenciales almacenadas incorrectas. Usando las predeterminadas.');
+          // Actualizamos con las credenciales correctas
+          sessionStorage.setItem('futbol7-auth', JSON.stringify(DEFAULT_CREDENTIALS));
+          setAuthState({
+            isAuthenticated: true,
+            username: DEFAULT_CREDENTIALS.username,
+            isLoading: false,
+            error: null
+          });
+        } else {
+          setAuthState({
+            isAuthenticated: true,
+            username,
+            isLoading: false,
+            error: null
+          });
+        }
+      } catch (e) {
+        // Si hay un error al parsear, borramos el ítem corrupto y usamos las predeterminadas
+        console.error('Error al parsear credenciales almacenadas:', e);
+        sessionStorage.removeItem('futbol7-auth');
+        sessionStorage.setItem('futbol7-auth', JSON.stringify(DEFAULT_CREDENTIALS));
         setAuthState({
           isAuthenticated: true,
-          username,
+          username: DEFAULT_CREDENTIALS.username,
           isLoading: false,
           error: null
         });
-      } catch (e) {
-        // Si hay un error al parsear, borramos el ítem corrupto
-        sessionStorage.removeItem('futbol7-auth');
-        setAuthState(prev => ({ ...prev, isLoading: false }));
       }
     } else {
       // Si no hay credenciales, las precargamos con las proporcionadas
-      const defaultAuth = {
-        username: 'CE4032',
-        password: '9525'
-      };
-      sessionStorage.setItem('futbol7-auth', JSON.stringify(defaultAuth));
+      sessionStorage.setItem('futbol7-auth', JSON.stringify(DEFAULT_CREDENTIALS));
       
       setAuthState({
         isAuthenticated: true,
-        username: defaultAuth.username,
+        username: DEFAULT_CREDENTIALS.username,
         isLoading: false,
         error: null
       });
@@ -62,21 +85,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      // Usamos las credenciales proporcionadas
-      // Si no se proporcionan, usamos las credenciales por defecto
-      const authUsername = username || 'CE4032';
-      const authPassword = password || '9525';
+      // Verificamos si son las credenciales correctas
+      if (username !== DEFAULT_CREDENTIALS.username || password !== DEFAULT_CREDENTIALS.password) {
+        throw new Error(`Credenciales incorrectas. Usuario=CE4032, Contraseña=9525`);
+      }
       
       // Simulamos un retraso para la autenticación
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Almacenamos la información básica en sessionStorage
-      const authData = { username: authUsername, password: authPassword };
+      const authData = { username, password };
       sessionStorage.setItem('futbol7-auth', JSON.stringify(authData));
       
       setAuthState({
         isAuthenticated: true,
-        username: authUsername,
+        username,
         isLoading: false,
         error: null
       });
@@ -131,4 +154,3 @@ export const useAuth = (): AuthContextType => {
   
   return context;
 };
-

@@ -19,6 +19,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intentos, setIntentos] = useState(0);
+  const [usandoDatosFallback, setUsandoDatosFallback] = useState(false);
   const { toast } = useToast();
 
   // Carga inicial de datos
@@ -49,15 +50,32 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     setIsLoading(true);
     setError(null);
     setIntentos(prev => prev + 1);
+    setUsandoDatosFallback(false);
 
     try {
-      // Aseguramos que estamos usando exactamente las credenciales requeridas
+      // Verificamos y forzamos las credenciales correctas
       const credenciales = {
         username: 'CE4032',
         password: '9525'
       };
       
-      console.log(`Intento #${intentos + 1} - Cargando datos con credenciales: ${credenciales.username}`);
+      console.log(`Intento #${intentos + 1} - Verificando conexión a internet...`);
+      
+      // Verificamos la conectividad a internet primero
+      try {
+        const connectionTest = await fetch('https://www.google.com', { 
+          method: 'HEAD',
+          // Agregamos un timestamp para evitar caché
+          cache: 'no-store',
+          mode: 'no-cors'
+        });
+        console.log('Conectividad a internet: OK');
+      } catch (connError) {
+        console.error('Error de conectividad a internet:', connError);
+        throw new Error('No hay conexión a internet. Verifica tu conexión y vuelve a intentarlo.');
+      }
+      
+      console.log(`Cargando datos con credenciales: Usuario=${credenciales.username}, Contraseña=${credenciales.password}`);
       
       const result = await extraerTodosLosDatos(credenciales);
       
@@ -85,17 +103,19 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       setError(message);
       
       toast({
-        title: 'Error',
-        description: message,
+        title: 'Error de conexión',
+        description: `${message}. Verifique que las credenciales (CE4032/9525) sean correctas y que tenga conexión a internet.`,
         variant: 'destructive',
       });
       
-      // Si es el primer intento, reintentamos automáticamente una vez
-      if (intentos <= 1) {
-        console.log('Reintentando automáticamente...');
+      // Si es el primer o segundo intento, reintentamos automáticamente
+      if (intentos <= 2) {
+        console.log(`Reintentando automáticamente (intento ${intentos + 1} de 3)...`);
         setTimeout(() => {
           cargarDatos();
-        }, 2000);
+        }, 3000);
+      } else {
+        console.log('Número máximo de intentos alcanzado');
       }
     } finally {
       setIsLoading(false);
@@ -121,7 +141,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     actualizarFiltros,
     resetearFiltros,
     cargarDatos,
-    usandoDatosFallback: false // Siempre es false porque ya no usamos datos fallback
+    usandoDatosFallback
   };
 };
 

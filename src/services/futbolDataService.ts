@@ -1,4 +1,3 @@
-
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -115,70 +114,89 @@ const generarDatosFallback = (): Jugador[] => {
 // Función para extraer datos de una URL específica
 export const extraerDatosDeURL = async (url: string, auth: { username: string; password: string }): Promise<Jugador[]> => {
   try {
-    // Usamos cors-proxy.htmldriven.com como alternativa (es más fiable)
-    const proxyUrl = `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`;
+    // Verificamos que estén las credenciales correctas
+    if (auth.username !== 'CE4032' || auth.password !== '9525') {
+      console.error('Credenciales incorrectas. Se requiere CE4032/9525');
+      throw new Error('Credenciales incorrectas. Se requiere CE4032/9525');
+    }
+    
+    // Probamos con varios proxies CORS diferentes para aumentar la probabilidad de éxito
+    const proxies = [
+      (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      (url: string) => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`,
+      (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+    ];
     
     console.log(`Intentando extraer datos de: ${url}`);
     
     // Preparamos la autenticación Basic
     const authHeader = `Basic ${btoa(`${auth.username}:${auth.password}`)}`;
+    console.log(`Usando credenciales: ${auth.username}/${auth.password}`);
     
-    const response = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'omit', // Importante para evitar problemas con CORS
-    });
+    let lastError;
+    // Intentamos con cada proxy hasta que uno funcione
+    for (let i = 0; i < proxies.length; i++) {
+      const proxyUrl = proxies[i](url);
+      
+      try {
+        console.log(`Probando proxy #${i+1}: ${proxyUrl.substring(0, 50)}...`);
+        
+        const response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'omit', // Importante para evitar problemas con CORS
+        });
 
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
 
-    // Esta API responde con un objeto que contiene la propiedad 'contents'
-    const data = await response.json();
-    const html = data.contents;
-    
-    if (!html) {
-      throw new Error('No se recibió contenido HTML');
+        // Verificamos si es el proxy que incluye la propiedad 'contents'
+        if (proxyUrl.includes('htmldriven')) {
+          const data = await response.json();
+          if (!data.contents) {
+            throw new Error('No se recibió contenido HTML del proxy');
+          }
+          console.log(`Proxy #${i+1} exitoso!`);
+          return extraerJugadoresDeHTML(data.contents, url);
+        } else {
+          // Otros proxies devuelven HTML directamente
+          const html = await response.text();
+          if (!html || html.length < 100) {
+            throw new Error('Respuesta HTML demasiado corta o vacía');
+          }
+          console.log(`Proxy #${i+1} exitoso!`);
+          return extraerJugadoresDeHTML(html, url);
+        }
+      } catch (error) {
+        console.warn(`Error con proxy #${i+1}:`, error);
+        lastError = error;
+        // Continuamos con el siguiente proxy
+      }
     }
     
-    return extraerJugadoresDeHTML(html, url);
+    // Si llegamos aquí, todos los proxies fallaron
+    throw new Error(`Todos los proxies CORS fallaron: ${lastError?.message || 'Error desconocido'}`);
   } catch (error) {
     console.error(`Error extrayendo datos de ${url}:`, error);
-    
-    // Intentamos con otro proxy como plan B
-    try {
-      const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
-      console.log(`Intentando proxy alternativo para: ${url}`);
-      
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${btoa(`${auth.username}:${auth.password}`)}`,
-        },
-        credentials: 'omit',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error con proxy alternativo: ${response.status}`);
-      }
-      
-      const html = await response.text();
-      return extraerJugadoresDeHTML(html, url);
-    } catch (secondError) {
-      console.error(`Error con proxy alternativo para ${url}:`, secondError);
-      throw new Error(`No se pudo extraer los datos usando múltiples proxies: ${secondError.message}`);
-    }
+    throw error; // Propagamos el error para manejarlo en extraerTodosLosDatos
   }
 };
 
 // Función para extraer datos de todas las URLs
 export const extraerTodosLosDatos = async (auth: { username: string; password: string }): Promise<Jugador[]> => {
   try {
-    console.log("Iniciando extracción de datos con credenciales:", auth.username);
+    console.log("Iniciando extracción de datos con credenciales:", auth.username, auth.password);
+    
+    // Verificamos que estén las credenciales correctas
+    if (auth.username !== 'CE4032' || auth.password !== '9525') {
+      throw new Error('Credenciales incorrectas. Se requiere CE4032/9525.');
+    }
     
     const urlsAUsar = URLS_DATOS; // Usar todas las URLs
     
@@ -211,7 +229,12 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
     // Si no se pudieron extraer datos o hubo demasiados fallos, mostramos un error
     if (datosExtraidos.length === 0 || fallosTotal === urlsAUsar.length) {
       console.error("Fallo crítico: No se pudo extraer ningún dato real");
-      throw new Error("No se pudo extraer datos de ninguna URL. Verifique las credenciales y la conexión.");
+      throw new Error(
+        "No se pudo extraer datos de ninguna URL. Verificar: \n" +
+        "1. Credenciales: Usuario=CE4032, Contraseña=9525 \n" + 
+        "2. Su conexión a internet \n" +
+        "3. Si la página web de origen está funcionando"
+      );
     }
     
     return datosExtraidos;
@@ -243,7 +266,7 @@ export const filtrarJugadores = (jugadores: Jugador[], filtros: FiltroJugadores)
   });
 };
 
-// Función para extraer jugadores del HTML
+// Función para extraer jugadores del HTML - actualizada para ser más robusta
 const extraerJugadoresDeHTML = (html: string, url: string): Jugador[] => {
   const jugadores: Jugador[] = [];
   const urlInfo = URLS_DATOS.find(info => info.url === url);
@@ -252,12 +275,20 @@ const extraerJugadoresDeHTML = (html: string, url: string): Jugador[] => {
   
   const { categoria, grupo } = urlInfo;
   
-  // Creamos un DOM para poder manipular el HTML
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
+  console.log(`Procesando HTML para ${categoria} ${grupo} (longitud HTML: ${html.length})`);
+  
+  // Si el HTML es muy corto, probablemente hubo un error
+  if (html.length < 1000) {
+    console.warn(`HTML demasiado corto (${html.length} caracteres) para ${categoria} ${grupo}`);
+    if (html.length < 100) {
+      console.log("Contenido HTML:", html);
+    }
+  }
   
   try {
-    console.log(`Procesando HTML para ${categoria} ${grupo}`);
+    // Creamos un DOM para poder manipular el HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
     
     // Buscamos todas las tablas
     const tablas = doc.querySelectorAll('table');
