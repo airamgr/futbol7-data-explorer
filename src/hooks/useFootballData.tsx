@@ -18,7 +18,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [filtros, setFiltros] = useState<FiltroJugadores>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usandoDatosFallback, setUsandoDatosFallback] = useState(false);
+  const [intentos, setIntentos] = useState(0);
   const { toast } = useToast();
 
   // Carga inicial de datos
@@ -48,39 +48,32 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
 
     setIsLoading(true);
     setError(null);
-    setUsandoDatosFallback(false);
+    setIntentos(prev => prev + 1);
 
     try {
-      // Usamos las credenciales proporcionadas
+      // Aseguramos que estamos usando exactamente las credenciales requeridas
       const credenciales = {
-        username: auth.username || 'CE4032', // Usuario por defecto
-        password: auth.password || '9525'    // Contraseña por defecto
+        username: 'CE4032',
+        password: '9525'
       };
       
-      console.log('Cargando datos con credenciales:', credenciales.username);
+      console.log(`Intento #${intentos + 1} - Cargando datos con credenciales: ${credenciales.username}`);
       
       const result = await extraerTodosLosDatos(credenciales);
       
-      // Verificamos si estamos usando datos simulados
-      const sonDatosSimulados = result.length > 0 && result[0].id.startsWith('simulado-');
-      setUsandoDatosFallback(sonDatosSimulados);
+      if (result.length === 0) {
+        throw new Error('No se pudieron extraer datos. La respuesta está vacía.');
+      }
       
       setJugadores(result);
       setFilteredJugadores(result);
       
-      // Mensaje de éxito diferente según el origen de los datos
-      if (sonDatosSimulados) {
-        toast({
-          title: 'Usando datos simulados',
-          description: `No se pudieron extraer datos reales. Mostrando ${result.length} jugadores simulados.`,
-          variant: 'default',
-        });
-      } else {
-        toast({
-          title: 'Datos cargados correctamente',
-          description: `Se han encontrado ${result.length} jugadores`,
-        });
-      }
+      toast({
+        title: 'Datos cargados correctamente',
+        description: `Se han encontrado ${result.length} jugadores`,
+      });
+      
+      console.log(`Datos cargados correctamente: ${result.length} jugadores`);
     } catch (error) {
       console.error('Error al cargar datos:', error);
       let message = 'Error al cargar los datos';
@@ -96,6 +89,14 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
         description: message,
         variant: 'destructive',
       });
+      
+      // Si es el primer intento, reintentamos automáticamente una vez
+      if (intentos <= 1) {
+        console.log('Reintentando automáticamente...');
+        setTimeout(() => {
+          cargarDatos();
+        }, 2000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +121,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     actualizarFiltros,
     resetearFiltros,
     cargarDatos,
-    usandoDatosFallback
+    usandoDatosFallback: false // Siempre es false porque ya no usamos datos fallback
   };
 };
 
