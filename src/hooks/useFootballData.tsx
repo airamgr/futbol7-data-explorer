@@ -18,6 +18,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [filtros, setFiltros] = useState<FiltroJugadores>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usandoDatosFallback, setUsandoDatosFallback] = useState(false);
   const { toast } = useToast();
 
   // Carga inicial de datos
@@ -47,6 +48,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
 
     setIsLoading(true);
     setError(null);
+    setUsandoDatosFallback(false);
 
     try {
       // Usamos las credenciales proporcionadas
@@ -58,13 +60,27 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       console.log('Cargando datos con credenciales:', credenciales.username);
       
       const result = await extraerTodosLosDatos(credenciales);
+      
+      // Verificamos si estamos usando datos simulados
+      const sonDatosSimulados = result.length > 0 && result[0].id.startsWith('simulado-');
+      setUsandoDatosFallback(sonDatosSimulados);
+      
       setJugadores(result);
       setFilteredJugadores(result);
       
-      toast({
-        title: 'Datos cargados correctamente',
-        description: `Se han encontrado ${result.length} jugadores`,
-      });
+      // Mensaje de éxito diferente según el origen de los datos
+      if (sonDatosSimulados) {
+        toast({
+          title: 'Usando datos simulados',
+          description: `No se pudieron extraer datos reales. Mostrando ${result.length} jugadores simulados.`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Datos cargados correctamente',
+          description: `Se han encontrado ${result.length} jugadores`,
+        });
+      }
     } catch (error) {
       console.error('Error al cargar datos:', error);
       let message = 'Error al cargar los datos';
@@ -103,9 +119,9 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     filtros,
     actualizarFiltros,
     resetearFiltros,
-    cargarDatos
+    cargarDatos,
+    usandoDatosFallback
   };
 };
 
 export default useFootballData;
-
