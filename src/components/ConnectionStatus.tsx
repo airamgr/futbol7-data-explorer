@@ -1,5 +1,5 @@
 
-import { AlertTriangle, WifiOff, Database } from 'lucide-react';
+import { AlertTriangle, WifiOff, Database, ServerCrash } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 
@@ -9,8 +9,10 @@ interface ConnectionStatusProps {
 }
 
 const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) => {
-  // Check for Supabase connection error in the error message
+  // Check for different types of errors
   const isSupabaseError = error?.includes('Supabase') || error?.includes('supabase');
+  const isBackendError = error?.includes('backend') || error?.includes('Backend') || error?.includes('Python');
+  const isExtractionError = error?.includes('extraer') || error?.includes('No se pudieron extraer');
   
   if (!error && backendDisponible !== false) return null;
   
@@ -29,6 +31,22 @@ const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) =
             </p>
             <p className="text-xs mt-1">
               Ahora es necesario crear la tabla para almacenar los datos. Por favor, ejecuta la aplicación del backend en Python para crear la primera carga de datos.
+            </p>
+          </div>
+        )}
+        
+        {isExtractionError && (
+          <div className="mt-2 p-2 bg-orange-50 rounded-md text-sm">
+            <p className="font-semibold flex items-center">
+              <ServerCrash className="h-4 w-4 mr-1" /> 
+              Error al extraer datos
+            </p>
+            <p className="text-xs mt-1">
+              El servidor Python está funcionando pero hay un error al extraer los datos. Verifica los logs del backend para más detalles.
+              Posibles causas:
+              - Credenciales incorrectas
+              - Problema con las URLs de origen
+              - Error en el proceso de scraping
             </p>
           </div>
         )}

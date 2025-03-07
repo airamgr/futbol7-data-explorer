@@ -57,6 +57,12 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
       return result;
     } catch (error) {
       console.error('Error al obtener datos desde backend:', error);
+      
+      // Mensaje personalizado para errores 500
+      if (error instanceof Error && error.message.includes('500')) {
+        throw new Error('Error en el servidor Python (500): Hay un problema al extraer los datos. Verifica los logs del servidor Python para más detalles.');
+      }
+      
       throw error;
     }
   };
@@ -104,7 +110,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
         description: 'Se requiere autenticación para cargar datos',
         variant: 'destructive',
       });
-      return;
+      return [];
     }
 
     setIsLoading(true);
@@ -146,8 +152,15 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
       const disponible = await verificarBackendDisponible();
       
       if (disponible) {
-        const players = await obtenerDatosDesdeBackend(auth);
-        return players;
+        try {
+          const players = await obtenerDatosDesdeBackend(auth);
+          return players;
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('500')) {
+            throw new Error('Error en el servidor Python (500): El servidor devolvió un error interno. Revisa los logs del servidor para ver detalles del error.');
+          }
+          throw error;
+        }
       } else {
         throw new Error('No hay datos disponibles en Supabase y el backend no está disponible');
       }
@@ -164,7 +177,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
       
       toast({
         title: 'Error de conexión',
-        description: `${message}. Asegúrate de que el servidor Python esté en ejecución en http://localhost:8000`,
+        description: `${message}. Revisa los logs del servidor Python para más detalles.`,
         variant: 'destructive',
       });
       

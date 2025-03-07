@@ -1,3 +1,4 @@
+
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -97,6 +98,7 @@ const API_BASE_URL = import.meta.env.DEV
 // Función para verificar que el backend está disponible
 export const verificarBackendDisponible = async (): Promise<boolean> => {
   try {
+    console.log('Verificando disponibilidad del backend en:', API_BASE_URL);
     const response = await fetch(`${API_BASE_URL}/`, {
       method: 'GET',
       headers: {
@@ -104,6 +106,10 @@ export const verificarBackendDisponible = async (): Promise<boolean> => {
       },
       cache: 'no-store'
     });
+    
+    if (response.ok) {
+      console.log('Backend disponible, respuesta:', await response.text());
+    }
     
     return response.ok;
   } catch (error) {
@@ -149,6 +155,7 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
     }
     
     // Hacemos la solicitud al endpoint de extracción
+    console.log("Enviando solicitud a /extraer-datos");
     const response = await fetch(`${API_BASE_URL}/extraer-datos`, {
       method: 'POST',
       headers: {
@@ -158,13 +165,26 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
     });
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.detail || `Error ${response.status}: ${response.statusText}`;
-      console.error("Error en la respuesta del backend:", errorMessage);
-      throw new Error(errorMessage);
+      const errorText = await response.text();
+      console.error(`Error del servidor (${response.status}): ${errorText}`);
+      
+      try {
+        // Intentamos parsear el error como JSON
+        const errorData = JSON.parse(errorText);
+        const errorMessage = errorData.detail || `Error ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
+      } catch (parseError) {
+        // Si no podemos parsear como JSON, usamos el texto tal cual
+        if (response.status === 500) {
+          throw new Error(`Error 500: Error interno del servidor Python. Revisa los logs para más detalles.`);
+        } else {
+          throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+        }
+      }
     }
     
     const data = await response.json();
+    console.log("Datos extraídos correctamente:", data);
     
     // Convertimos los datos a nuestro formato
     return data.jugadores as Jugador[];

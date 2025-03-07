@@ -1,5 +1,5 @@
 
-import { Database } from 'lucide-react';
+import { Database, ServerCrash } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -19,8 +19,12 @@ const Footer = () => {
           </div>
         </div>
         <div className="mt-4 text-center text-xs text-slate-500">
-          <p>Supabase está conectado. Ahora necesitas iniciar el backend Python para cargar los datos.</p>
+          <p>Supabase está conectado. Ahora necesitas iniciar el backend Python y resolver cualquier error de extracción.</p>
           <p className="font-mono mt-1 bg-slate-800 p-1 rounded">cd backend && uvicorn main:app --reload</p>
+          <p className="mt-2 text-orange-400 flex items-center justify-center">
+            <ServerCrash className="h-3 w-3 mr-1" />
+            Si ves un error 500, revisa los logs de Python para detalles del error de extracción
+          </p>
         </div>
       </div>
     </footer>
