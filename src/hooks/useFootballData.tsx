@@ -5,7 +5,8 @@ import {
   filtrarJugadores, 
   Jugador, 
   FiltroJugadores,
-  generarDatosFallback
+  generarDatosFallback,
+  verificarBackendDisponible
 } from '@/services/futbolDataService';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -21,7 +22,26 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [error, setError] = useState<string | null>(null);
   const [intentos, setIntentos] = useState(0);
   const [usandoDatosFallback, setUsandoDatosFallback] = useState(false);
+  const [backendDisponible, setBackendDisponible] = useState<boolean | null>(null);
   const { toast } = useToast();
+
+  // Verificar disponibilidad del backend al inicio
+  useEffect(() => {
+    const verificarBackend = async () => {
+      const disponible = await verificarBackendDisponible();
+      setBackendDisponible(disponible);
+      
+      if (!disponible) {
+        toast({
+          title: "Backend no disponible",
+          description: "El servidor Python no está disponible. Asegúrate de iniciarlo con 'uvicorn main:app --reload'",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    verificarBackend();
+  }, [toast]);
 
   // Carga inicial de datos
   useEffect(() => {
@@ -51,41 +71,6 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     }
   }, [jugadores, filtros]);
 
-  // Función para verificar la conectividad básica a Internet
-  const verificarConectividad = async (): Promise<boolean> => {
-    try {
-      // Intentamos con varias URLs para mayor confiabilidad
-      const urlsVerificacion = [
-        'https://www.google.com',
-        'https://www.cloudflare.com',
-        'https://www.apple.com'
-      ];
-      
-      for (const url of urlsVerificacion) {
-        try {
-          const response = await fetch(url, { 
-            method: 'HEAD', 
-            mode: 'no-cors',
-            cache: 'no-store',
-            // Timeout de 5 segundos
-            signal: AbortSignal.timeout(5000)
-          });
-          console.log(`Conectividad verificada con ${url}`);
-          return true;
-        } catch (err) {
-          console.warn(`Fallo verificando con ${url}:`, err);
-          // Continuamos con la siguiente URL
-        }
-      }
-      
-      // Si llegamos aquí, todas las pruebas fallaron
-      return false;
-    } catch (error) {
-      console.error("Error al verificar conectividad:", error);
-      return false;
-    }
-  };
-
   const cargarDatos = async () => {
     if (!auth) {
       setError('Se requiere autenticación para cargar datos');
@@ -94,6 +79,26 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
         description: 'Se requiere autenticación para cargar datos',
         variant: 'destructive',
       });
+      return;
+    }
+
+    // Verificar si el backend está disponible
+    const disponible = await verificarBackendDisponible();
+    setBackendDisponible(disponible);
+    
+    if (!disponible) {
+      setError('El servidor Python no está disponible. Asegúrate de iniciarlo con "uvicorn main:app --reload"');
+      toast({
+        title: 'Backend no disponible',
+        description: 'El servidor Python no está disponible. Asegúrate de iniciarlo con "uvicorn main:app --reload"',
+        variant: 'destructive',
+      });
+      
+      // Usar datos fallback si no hay backend
+      const datosFallback = generarDatosFallback();
+      setJugadores(datosFallback);
+      setFilteredJugadores(datosFallback);
+      setUsandoDatosFallback(true);
       return;
     }
 
@@ -108,19 +113,9 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
         password: '9525'
       };
       
-      console.log(`Intento #${intentos + 1} - Verificando conexión a internet...`);
+      console.log(`Intento #${intentos + 1} - Enviando solicitud al backend de Python...`);
       
-      // Verificamos la conectividad a internet primero
-      const conectividadOK = await verificarConectividad();
-      
-      if (!conectividadOK) {
-        throw new Error('No se detecta conexión a internet. Verifica tu conectividad y vuelve a intentarlo.');
-      }
-      
-      console.log('Conectividad a internet: OK');
-      console.log(`Cargando datos con credenciales: Usuario=${credenciales.username}, Contraseña=${credenciales.password}`);
-      
-      // Intentar extraer datos reales
+      // Intentar extraer datos reales usando el backend de Python
       try {
         const result = await extraerTodosLosDatos(credenciales);
         
@@ -206,19 +201,9 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       
       toast({
         title: 'Error de conexión',
-        description: `${message}. Verifique que las credenciales (CE4032/9525) sean correctas y que tenga conexión a internet.`,
+        description: `${message}. Asegúrate de que el servidor Python esté en ejecución en http://localhost:8000`,
         variant: 'destructive',
       });
-      
-      // Si es el primer o segundo intento, reintentamos automáticamente
-      if (intentos <= 2) {
-        console.log(`Reintentando automáticamente (intento ${intentos + 1} de 3)...`);
-        setTimeout(() => {
-          cargarDatos();
-        }, 3000);
-      } else {
-        console.log('Número máximo de intentos alcanzado');
-      }
     } finally {
       setIsLoading(false);
     }
@@ -243,7 +228,8 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     actualizarFiltros,
     resetearFiltros,
     cargarDatos,
-    usandoDatosFallback
+    usandoDatosFallback,
+    backendDisponible
   };
 };
 
