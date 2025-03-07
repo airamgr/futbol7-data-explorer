@@ -7,6 +7,7 @@ export interface Jugador {
   goles: number;
   fechaNacimiento?: string;
   partidosJugados?: number;
+  lastUpdated?: string;
 }
 
 export interface FiltroJugadores {
@@ -111,59 +112,6 @@ export const verificarBackendDisponible = async (): Promise<boolean> => {
   }
 };
 
-// Creamos algunos datos fallback para cuando la extracción real falla
-export const generarDatosFallback = (): Jugador[] => {
-  const categorias = ["Prebenjamín", "Benjamín", "Alevín"];
-  const equipos = ["Cultural Leonesa", "Real Valladolid", "Zamora CF", "CD Numancia", "CD Palencia", "UD Salamanca", "SD Ponferradina"];
-  const jugadores: Jugador[] = [];
-  
-  for (let i = 1; i <= 100; i++) {
-    const categoria = categorias[Math.floor(Math.random() * categorias.length)];
-    const equipo = equipos[Math.floor(Math.random() * equipos.length)];
-    
-    jugadores.push({
-      id: `simulado-${i}`,
-      nombre: `Jugador Simulado ${i}`,
-      equipo,
-      categoria,
-      goles: Math.floor(Math.random() * 20),
-      partidosJugados: Math.floor(Math.random() * 15) + 5,
-      fechaNacimiento: generarFechaNacimientoAleatoria(categoria)
-    });
-  }
-  
-  return jugadores.sort((a, b) => b.goles - a.goles);
-};
-
-// Función auxiliar para generar fechas de nacimiento según la categoría
-const generarFechaNacimientoAleatoria = (categoria: string): string => {
-  // Asignamos edades según categoría
-  let rangoEdadMin = 6;
-  let rangoEdadMax = 12;
-  
-  switch(categoria) {
-    case "Prebenjamín":
-      rangoEdadMin = 6;
-      rangoEdadMax = 8;
-      break;
-    case "Benjamín":
-      rangoEdadMin = 8;
-      rangoEdadMax = 10;
-      break;
-    case "Alevín":
-      rangoEdadMin = 10;
-      rangoEdadMax = 12;
-      break;
-  }
-  
-  const actualYear = new Date().getFullYear();
-  const birthYear = actualYear - (rangoEdadMin + Math.floor(Math.random() * (rangoEdadMax - rangoEdadMin + 1)));
-  const birthMonth = 1 + Math.floor(Math.random() * 12);
-  const birthDay = 1 + Math.floor(Math.random() * 28);
-  
-  return `${birthYear}-${birthMonth.toString().padStart(2, '0')}-${birthDay.toString().padStart(2, '0')}`;
-};
-
 // Nueva función para verificar credenciales
 export const verificarCredenciales = async (auth: { username: string; password: string }): Promise<boolean> => {
   try {
@@ -217,10 +165,6 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
     }
     
     const data = await response.json();
-    
-    if (data.usando_fallback) {
-      console.warn("El backend está usando datos de fallback", data.errores);
-    }
     
     // Convertimos los datos a nuestro formato
     return data.jugadores as Jugador[];

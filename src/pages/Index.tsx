@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useFootballData } from '@/hooks/useFootballData';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronDown, LogOut, DownloadCloud, AlertTriangle, WifiOff, ServerCrash } from 'lucide-react';
+import { ChevronDown, LogOut, DownloadCloud, AlertTriangle, WifiOff, Database, ServerCrash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -47,7 +46,8 @@ const Index = () => {
     actualizarFiltros,
     resetearFiltros,
     cargarDatos,
-    usandoDatosFallback
+    dataSource,
+    backendDisponible
   } = useFootballData({ auth: authCredentials });
   
   // Manejar login
@@ -137,10 +137,10 @@ const Index = () => {
             <AlertTitle>Problemas de conexión</AlertTitle>
             <AlertDescription className="flex items-center space-x-2">
               <span>{dataError}</span>
-              {usandoDatosFallback && (
+              {!backendDisponible && (
                 <Badge variant="outline" className="ml-2 bg-yellow-100">
                   <WifiOff className="h-3 w-3 mr-1" />
-                  Usando datos simulados
+                  Backend no disponible
                 </Badge>
               )}
             </AlertDescription>
@@ -213,14 +213,28 @@ const Index = () => {
         </div>
         
         {/* Status del origen de datos */}
-        {usandoDatosFallback && (
-          <div className="mb-6">
-            <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
-              <ServerCrash className="h-3 w-3 mr-1" />
-              Mostrando datos simulados para demostración
+        <div className="mb-6">
+          {dataSource === 'supabase' && (
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200">
+              <Database className="h-3 w-3 mr-1" />
+              Datos cargados desde Supabase
             </Badge>
-          </div>
-        )}
+          )}
+          
+          {dataSource === 'backend' && (
+            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 ml-2">
+              <ServerCrash className="h-3 w-3 mr-1" />
+              Datos actualizados desde backend
+            </Badge>
+          )}
+          
+          {!backendDisponible && (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 ml-2">
+              <WifiOff className="h-3 w-3 mr-1" />
+              Backend no disponible
+            </Badge>
+          )}
+        </div>
         
         {/* Panel de resumen */}
         <motion.div
@@ -282,7 +296,6 @@ const Index = () => {
           </motion.div>
         </motion.div>
         
-        {/* Contenido principal con tabs */}
         <Tabs defaultValue="tabla" className="w-full">
           <TabsList className="mb-8 bg-white/50 backdrop-blur-sm">
             <TabsTrigger value="tabla">Tabla de Datos</TabsTrigger>
@@ -318,7 +331,6 @@ const Index = () => {
         </Tabs>
       </main>
       
-      {/* Footer */}
       <footer className="bg-slate-900 text-white py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
@@ -329,7 +341,7 @@ const Index = () => {
             </div>
             <div className="mt-4 md:mt-0">
               <p className="text-slate-400 text-sm">
-                Datos extraídos de intranet.rfcylf.es
+                Datos extraídos de intranet.rfcylf.es y almacenados en Supabase
               </p>
             </div>
           </div>

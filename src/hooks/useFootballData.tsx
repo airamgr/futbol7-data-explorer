@@ -5,9 +5,12 @@ import {
   filtrarJugadores, 
   Jugador, 
   FiltroJugadores,
-  generarDatosFallback,
   verificarBackendDisponible
 } from '@/services/futbolDataService';
+import { 
+  storeJugadoresInSupabase, 
+  getJugadoresFromSupabase 
+} from '@/services/supabaseService';
 import { useToast } from '@/components/ui/use-toast';
 
 interface UseFootballDataProps {
@@ -21,8 +24,8 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intentos, setIntentos] = useState(0);
-  const [usandoDatosFallback, setUsandoDatosFallback] = useState(false);
   const [backendDisponible, setBackendDisponible] = useState<boolean | null>(null);
+  const [dataSource, setDataSource] = useState<'supabase' | 'backend' | null>(null);
   const { toast } = useToast();
 
   // Verificar disponibilidad del backend al inicio
@@ -46,21 +49,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   // Carga inicial de datos
   useEffect(() => {
     if (auth) {
-      // Intentar cargar datos desde sessionStorage primero
-      const cachedData = sessionStorage.getItem('futbol7-cached-data');
-      if (cachedData) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          setJugadores(parsed);
-          setFilteredJugadores(parsed);
-          console.log('Datos cargados desde caché local:', parsed.length);
-        } catch (e) {
-          console.error('Error al cargar datos en caché:', e);
-          cargarDatos();
-        }
-      } else {
-        cargarDatos();
-      }
+      cargarDatos();
     }
   }, [auth]);
 
@@ -82,107 +71,50 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       return;
     }
 
-    // Verificar si el backend está disponible
-    const disponible = await verificarBackendDisponible();
-    setBackendDisponible(disponible);
-    
-    if (!disponible) {
-      setError('El servidor Python no está disponible. Asegúrate de iniciarlo con "uvicorn main:app --reload"');
-      toast({
-        title: 'Backend no disponible',
-        description: 'El servidor Python no está disponible. Asegúrate de iniciarlo con "uvicorn main:app --reload"',
-        variant: 'destructive',
-      });
-      
-      // Usar datos fallback si no hay backend
-      const datosFallback = generarDatosFallback();
-      setJugadores(datosFallback);
-      setFilteredJugadores(datosFallback);
-      setUsandoDatosFallback(true);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     setIntentos(prev => prev + 1);
     
     try {
-      // Verificamos y forzamos las credenciales correctas
-      const credenciales = {
-        username: 'CE4032',
-        password: '9525'
-      };
+      // Primero intentamos cargar datos desde Supabase
+      const supabaseResult = await getJugadoresFromSupabase();
       
-      console.log(`Intento #${intentos + 1} - Enviando solicitud al backend de Python...`);
-      
-      // Intentar extraer datos reales usando el backend de Python
-      try {
-        const result = await extraerTodosLosDatos(credenciales);
-        
-        if (result.length === 0) {
-          throw new Error('No se pudieron extraer datos. La respuesta está vacía.');
-        }
-        
-        // Guardar en caché si hay datos
-        sessionStorage.setItem('futbol7-cached-data', JSON.stringify(result));
-        
-        setJugadores(result);
-        setFilteredJugadores(result);
-        setUsandoDatosFallback(false);
+      if (supabaseResult.jugadores.length > 0) {
+        setJugadores(supabaseResult.jugadores);
+        setFilteredJugadores(supabaseResult.jugadores);
+        setDataSource('supabase');
         
         toast({
-          title: 'Datos cargados correctamente',
-          description: `Se han encontrado ${result.length} jugadores`,
+          title: 'Datos cargados desde Supabase',
+          description: `Se han encontrado ${supabaseResult.jugadores.length} jugadores en la base de datos`,
         });
         
-        console.log(`Datos cargados correctamente: ${result.length} jugadores`);
-      } catch (dataError) {
-        console.error('Error al extraer datos reales:', dataError);
+        console.log(`Datos cargados desde Supabase: ${supabaseResult.jugadores.length} jugadores`);
         
-        // Verificar si hay datos en caché
-        const cachedData = sessionStorage.getItem('futbol7-cached-data');
-        if (cachedData) {
-          try {
-            const parsed = JSON.parse(cachedData);
-            if (parsed.length > 0) {
-              setJugadores(parsed);
-              setFilteredJugadores(parsed);
-              setUsandoDatosFallback(false);
-              
-              toast({
-                title: 'Usando datos en caché',
-                description: `No se pudieron obtener datos nuevos. Usando ${parsed.length} registros en caché.`,
-              });
-              
-              console.log(`Usando datos en caché: ${parsed.length} jugadores`);
-              return;
-            }
-          } catch (e) {
-            console.error('Error al parsear datos en caché:', e);
-          }
+        // Verificamos si el backend está disponible para actualizar los datos
+        const disponible = await verificarBackendDisponible();
+        setBackendDisponible(disponible);
+        
+        if (disponible) {
+          // Si el backend está disponible, intentamos actualizar los datos en segundo plano
+          toast({
+            title: 'Actualizando datos',
+            description: 'Obteniendo datos actualizados del servidor...',
+          });
+          
+          actualizarDatosDesdeBackend(auth);
         }
         
-        // Si no hay caché o está vacía, usar datos fallback
-        const datosFallback = generarDatosFallback();
-        setJugadores(datosFallback);
-        setFilteredJugadores(datosFallback);
-        setUsandoDatosFallback(true);
-        
-        let message = 'Error al cargar los datos';
-        if (dataError instanceof Error) {
-          message = dataError.message;
-        }
-        
-        setError(message);
-        
-        toast({
-          title: 'Usando datos simulados',
-          description: `${message}. Se están mostrando datos simulados para demostración.`,
-          variant: 'destructive',
-        });
-        
-        console.log(`Usando datos fallback: ${datosFallback.length} jugadores simulados`);
+        return;
       }
+      
+      // Si no hay datos en Supabase, intentamos cargar desde el backend
+      if (backendDisponible) {
+        await obtenerDatosDesdeBackend(auth);
+      } else {
+        throw new Error('No hay datos disponibles en Supabase y el backend no está disponible');
+      }
+      
     } catch (error) {
       console.error('Error general al cargar datos:', error);
       let message = 'Error al cargar los datos';
@@ -193,12 +125,6 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       
       setError(message);
       
-      // Usar datos fallback como último recurso
-      const datosFallback = generarDatosFallback();
-      setJugadores(datosFallback);
-      setFilteredJugadores(datosFallback);
-      setUsandoDatosFallback(true);
-      
       toast({
         title: 'Error de conexión',
         description: `${message}. Asegúrate de que el servidor Python esté en ejecución en http://localhost:8000`,
@@ -206,6 +132,83 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const obtenerDatosDesdeBackend = async (credentials: { username: string; password: string }) => {
+    try {
+      // Extraemos datos del backend
+      const result = await extraerTodosLosDatos(credentials);
+      
+      if (result.length === 0) {
+        throw new Error('No se pudieron extraer datos. La respuesta está vacía.');
+      }
+      
+      // Guardamos los datos en Supabase
+      const storeResult = await storeJugadoresInSupabase(result);
+      
+      if (storeResult.success) {
+        toast({
+          title: 'Datos guardados en Supabase',
+          description: `Se han guardado ${result.length} jugadores en la base de datos`,
+        });
+      } else {
+        toast({
+          title: 'Error al guardar en Supabase',
+          description: storeResult.error || 'No se pudieron guardar los datos en Supabase',
+          variant: 'destructive',
+        });
+      }
+      
+      setJugadores(result);
+      setFilteredJugadores(result);
+      setDataSource('backend');
+      
+      toast({
+        title: 'Datos cargados correctamente',
+        description: `Se han encontrado ${result.length} jugadores`,
+      });
+      
+      console.log(`Datos cargados correctamente desde backend: ${result.length} jugadores`);
+    } catch (error) {
+      console.error('Error al obtener datos desde backend:', error);
+      throw error;
+    }
+  };
+
+  const actualizarDatosDesdeBackend = async (credentials: { username: string; password: string }) => {
+    try {
+      console.log('Actualizando datos desde el backend en segundo plano...');
+      
+      // Extraemos datos del backend
+      const result = await extraerTodosLosDatos(credentials);
+      
+      if (result.length === 0) {
+        console.error('La actualización desde backend no devolvió datos');
+        return;
+      }
+      
+      // Guardamos los datos en Supabase
+      const storeResult = await storeJugadoresInSupabase(result);
+      
+      if (storeResult.success) {
+        console.log(`Datos actualizados correctamente: ${result.length} jugadores`);
+        
+        // Actualizamos los datos en la UI
+        setJugadores(result);
+        setFilteredJugadores(filtrarJugadores(result, filtros));
+        setDataSource('backend');
+        
+        toast({
+          title: 'Datos actualizados',
+          description: `Se han actualizado ${result.length} jugadores en la base de datos`,
+        });
+      } else {
+        console.error('Error al guardar datos actualizados en Supabase:', storeResult.error);
+      }
+    } catch (error) {
+      console.error('Error al actualizar datos desde backend:', error);
+      // No mostramos error al usuario ya que es una actualización en segundo plano
     }
   };
 
@@ -228,7 +231,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     actualizarFiltros,
     resetearFiltros,
     cargarDatos,
-    usandoDatosFallback,
+    dataSource,
     backendDisponible
   };
 };
