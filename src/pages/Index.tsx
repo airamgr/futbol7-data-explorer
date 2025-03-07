@@ -10,7 +10,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useFootballData } from '@/hooks/useFootballData';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronDown, LogOut, DownloadCloud } from 'lucide-react';
+import { ChevronDown, LogOut, DownloadCloud, AlertTriangle, WifiOff, ServerCrash } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -39,10 +42,12 @@ const Index = () => {
   const { 
     jugadores, 
     isLoading: dataLoading, 
+    error: dataError,
     filtros,
     actualizarFiltros,
     resetearFiltros,
-    cargarDatos
+    cargarDatos,
+    usandoDatosFallback
   } = useFootballData({ auth: authCredentials });
   
   // Manejar login
@@ -125,6 +130,23 @@ const Index = () => {
           )}
         </AnimatePresence>
         
+        {/* Estado de conexión */}
+        {dataError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            <AlertTitle>Problemas de conexión</AlertTitle>
+            <AlertDescription className="flex items-center space-x-2">
+              <span>{dataError}</span>
+              {usandoDatosFallback && (
+                <Badge variant="outline" className="ml-2 bg-yellow-100">
+                  <WifiOff className="h-3 w-3 mr-1" />
+                  Usando datos simulados
+                </Badge>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Cabecera y controles principales */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 mb-8">
           <div>
@@ -147,15 +169,37 @@ const Index = () => {
           </div>
           
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              onClick={cargarDatos} 
-              disabled={dataLoading}
-              className="hover:bg-primary/5"
-            >
-              <DownloadCloud className="h-4 w-4 mr-2" />
-              {dataLoading ? 'Cargando...' : 'Actualizar datos'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={cargarDatos} 
+                    disabled={dataLoading}
+                    className="hover:bg-primary/5"
+                  >
+                    {dataLoading ? (
+                      <>
+                        <motion.div
+                          className="h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                        Cargando...
+                      </>
+                    ) : (
+                      <>
+                        <DownloadCloud className="h-4 w-4 mr-2" />
+                        Actualizar datos
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Intenta cargar datos actualizados del servidor</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
             <Button 
               variant="ghost" 
@@ -167,6 +211,16 @@ const Index = () => {
             </Button>
           </div>
         </div>
+        
+        {/* Status del origen de datos */}
+        {usandoDatosFallback && (
+          <div className="mb-6">
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
+              <ServerCrash className="h-3 w-3 mr-1" />
+              Mostrando datos simulados para demostración
+            </Badge>
+          </div>
+        )}
         
         {/* Panel de resumen */}
         <motion.div

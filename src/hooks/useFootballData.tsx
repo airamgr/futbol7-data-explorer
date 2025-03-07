@@ -51,6 +51,41 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     }
   }, [jugadores, filtros]);
 
+  // Función para verificar la conectividad básica a Internet
+  const verificarConectividad = async (): Promise<boolean> => {
+    try {
+      // Intentamos con varias URLs para mayor confiabilidad
+      const urlsVerificacion = [
+        'https://www.google.com',
+        'https://www.cloudflare.com',
+        'https://www.apple.com'
+      ];
+      
+      for (const url of urlsVerificacion) {
+        try {
+          const response = await fetch(url, { 
+            method: 'HEAD', 
+            mode: 'no-cors',
+            cache: 'no-store',
+            // Timeout de 5 segundos
+            signal: AbortSignal.timeout(5000)
+          });
+          console.log(`Conectividad verificada con ${url}`);
+          return true;
+        } catch (err) {
+          console.warn(`Fallo verificando con ${url}:`, err);
+          // Continuamos con la siguiente URL
+        }
+      }
+      
+      // Si llegamos aquí, todas las pruebas fallaron
+      return false;
+    } catch (error) {
+      console.error("Error al verificar conectividad:", error);
+      return false;
+    }
+  };
+
   const cargarDatos = async () => {
     if (!auth) {
       setError('Se requiere autenticación para cargar datos');
@@ -76,19 +111,13 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       console.log(`Intento #${intentos + 1} - Verificando conexión a internet...`);
       
       // Verificamos la conectividad a internet primero
-      try {
-        const connectionTest = await fetch('https://www.google.com', { 
-          method: 'HEAD',
-          // Agregamos un timestamp para evitar caché
-          cache: 'no-store',
-          mode: 'no-cors'
-        });
-        console.log('Conectividad a internet: OK');
-      } catch (connError) {
-        console.error('Error de conectividad a internet:', connError);
-        throw new Error('No hay conexión a internet. Verifica tu conexión y vuelve a intentarlo.');
+      const conectividadOK = await verificarConectividad();
+      
+      if (!conectividadOK) {
+        throw new Error('No se detecta conexión a internet. Verifica tu conectividad y vuelve a intentarlo.');
       }
       
+      console.log('Conectividad a internet: OK');
       console.log(`Cargando datos con credenciales: Usuario=${credenciales.username}, Contraseña=${credenciales.password}`);
       
       // Intentar extraer datos reales
