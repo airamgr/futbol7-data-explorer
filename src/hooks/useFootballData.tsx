@@ -37,6 +37,11 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const cargarDatos = async () => {
     if (!auth) {
       setError('Se requiere autenticación para cargar datos');
+      toast({
+        title: 'Error',
+        description: 'Se requiere autenticación para cargar datos',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -44,7 +49,15 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     setError(null);
 
     try {
-      const result = await extraerTodosLosDatos(auth);
+      // Usamos las credenciales proporcionadas
+      const credenciales = {
+        username: auth.username || 'CE4032', // Usuario por defecto
+        password: auth.password || '9525'    // Contraseña por defecto
+      };
+      
+      console.log('Cargando datos con credenciales:', credenciales.username);
+      
+      const result = await extraerTodosLosDatos(credenciales);
       setJugadores(result);
       setFilteredJugadores(result);
       
@@ -95,3 +108,4 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
 };
 
 export default useFootballData;
+

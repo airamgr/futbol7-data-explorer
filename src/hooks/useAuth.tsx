@@ -42,7 +42,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthState(prev => ({ ...prev, isLoading: false }));
       }
     } else {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      // Si no hay credenciales, las precargamos con las proporcionadas
+      const defaultAuth = {
+        username: 'CE4032',
+        password: '9525'
+      };
+      sessionStorage.setItem('futbol7-auth', JSON.stringify(defaultAuth));
+      
+      setAuthState({
+        isAuthenticated: true,
+        username: defaultAuth.username,
+        isLoading: false,
+        error: null
+      });
     }
   }, []);
 
@@ -50,19 +62,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      // En una aplicación real, aquí se haría una petición al servidor
-      // para verificar las credenciales
+      // Usamos las credenciales proporcionadas
+      // Si no se proporcionan, usamos las credenciales por defecto
+      const authUsername = username || 'CE4032';
+      const authPassword = password || '9525';
       
       // Simulamos un retraso para la autenticación
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Almacenamos la información básica en sessionStorage
-      const authData = { username, password };
+      const authData = { username: authUsername, password: authPassword };
       sessionStorage.setItem('futbol7-auth', JSON.stringify(authData));
       
       setAuthState({
         isAuthenticated: true,
-        username,
+        username: authUsername,
         isLoading: false,
         error: null
       });
@@ -117,3 +131,4 @@ export const useAuth = (): AuthContextType => {
   
   return context;
 };
+
