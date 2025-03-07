@@ -69,6 +69,19 @@ export const Filtros = ({ jugadores, filtros, onFiltrosChange, onResetFiltros }:
   
   const filtrosActivos = contarFiltrosActivos();
   
+  // Handlers para los sliders que manejan correctamente la conversión de tipos
+  const handleEdadRangeChange = (value: number[]) => {
+    setEdadRange([value[0], value[1]] as [number, number]);
+  };
+
+  const handleGolesChange = (value: number[]) => {
+    setGolesMinimos(value[0]);
+  };
+
+  const handlePartidosChange = (value: number[]) => {
+    setPartidosMinimos(value[0]);
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -143,7 +156,7 @@ export const Filtros = ({ jugadores, filtros, onFiltrosChange, onResetFiltros }:
           max={12}
           step={1}
           value={edadRange}
-          onValueChange={setEdadRange}
+          onValueChange={handleEdadRangeChange}
           className="my-6"
         />
       </div>
@@ -160,7 +173,7 @@ export const Filtros = ({ jugadores, filtros, onFiltrosChange, onResetFiltros }:
           max={maxGoles}
           step={1}
           value={[golesMinimos]}
-          onValueChange={([value]) => setGolesMinimos(value)}
+          onValueChange={handleGolesChange}
         />
       </div>
       
@@ -176,7 +189,7 @@ export const Filtros = ({ jugadores, filtros, onFiltrosChange, onResetFiltros }:
           max={maxPartidos}
           step={1}
           value={[partidosMinimos]}
-          onValueChange={([value]) => setPartidosMinimos(value)}
+          onValueChange={handlePartidosChange}
         />
       </div>
       
