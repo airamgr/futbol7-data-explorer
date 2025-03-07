@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests
@@ -51,7 +50,56 @@ URLS_DATOS = [
         "categoria": "Prebenjamín",
         "grupo": "Grupo C"
     },
-    # ... keep existing code (rest of URLS_DATOS URLs)
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11380036&codgrupo=21735262",
+        "categoria": "Prebenjamín",
+        "grupo": "Grupo D"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379982&codgrupo=11379987",
+        "categoria": "Benjamín",
+        "grupo": "Grupo A"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379993&codgrupo=11379997",
+        "categoria": "Benjamín",
+        "grupo": "Grupo B"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11380005&codgrupo=11380011",
+        "categoria": "Benjamín",
+        "grupo": "Grupo C"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11380005&codgrupo=11380012",
+        "categoria": "Benjamín",
+        "grupo": "Grupo D"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379937&codgrupo=11379941",
+        "categoria": "Alevín",
+        "grupo": "Grupo A"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379948&codgrupo=11379952",
+        "categoria": "Alevín",
+        "grupo": "Grupo B"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379960&codgrupo=11379971",
+        "categoria": "Alevín",
+        "grupo": "Grupo C"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379960&codgrupo=11379972",
+        "categoria": "Alevín",
+        "grupo": "Grupo D"
+    },
+    {
+        "url": "https://intranet.rfcylf.es/nfg/NPcd/NFG_CMP_Goleadores?cod_primaria=1000128&codtemporada=&Sch_Cod_Agrupacion=1&codcompeticion=11379960&codgrupo=11379973",
+        "categoria": "Alevín",
+        "grupo": "Grupo E"
+    }
 ]
 
 # Función auxiliar para generar fechas de nacimiento según la categoría
@@ -76,29 +124,6 @@ def generar_fecha_nacimiento_aleatoria(categoria: str) -> str:
     birth_day = random.randint(1, 28)
     
     return f"{birth_year}-{birth_month:02d}-{birth_day:02d}"
-
-# Función para crear datos fallback cuando no se pueden obtener datos reales
-def generar_datos_fallback() -> List[Jugador]:
-    categorias = ["Prebenjamín", "Benjamín", "Alevín"]
-    equipos = ["Cultural Leonesa", "Real Valladolid", "Zamora CF", "CD Numancia", "CD Palencia", "UD Salamanca", "SD Ponferradina"]
-    jugadores = []
-    
-    for i in range(1, 101):
-        categoria = random.choice(categorias)
-        equipo = random.choice(equipos)
-        
-        jugadores.append(Jugador(
-            id=f"simulado-{i}",
-            nombre=f"Jugador Simulado {i}",
-            equipo=equipo,
-            categoria=categoria,
-            goles=random.randint(0, 20),
-            partidosJugados=random.randint(5, 20),
-            fechaNacimiento=generar_fecha_nacimiento_aleatoria(categoria)
-        ))
-    
-    # Ordenar por goles (mayor a menor)
-    return sorted(jugadores, key=lambda x: x.goles, reverse=True)
 
 # Función para extraer datos de una URL utilizando BeautifulSoup
 def extraer_jugadores_de_html(html: str, url: str) -> List[Jugador]:
@@ -205,10 +230,8 @@ def extraer_datos(credenciales: CredencialesModel):
     todos_jugadores = []
     errores = []
     
-    # Para mejorar rendimiento, limitamos a las primeras URLs
-    urls_muestra = URLS_DATOS[:4]
-    
-    for info in urls_muestra:
+    # Recorremos todas las URLs para extraer datos
+    for info in URLS_DATOS:
         try:
             # Usamos requests para obtener el HTML directamente (sin problemas de CORS)
             response = requests.get(
@@ -231,44 +254,12 @@ def extraer_datos(credenciales: CredencialesModel):
         except Exception as e:
             errores.append(f"Error en {info['categoria']} {info['grupo']}: {str(e)}")
     
-    # Si no pudimos obtener datos, generamos datos de fallback
+    # Si no pudimos obtener datos, devolvemos error
     if not todos_jugadores:
-        if urls_muestra != URLS_DATOS:
-            # Intentar con el resto de URLs
-            for info in URLS_DATOS[4:]:
-                try:
-                    response = requests.get(
-                        info["url"],
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                        },
-                        timeout=10
-                    )
-                    
-                    if response.status_code != 200:
-                        errores.append(f"Error {response.status_code} en {info['categoria']} {info['grupo']}")
-                        continue
-                        
-                    # Extraer jugadores del HTML
-                    html = response.text
-                    jugadores = extraer_jugadores_de_html(html, info["url"])
-                    todos_jugadores.extend(jugadores)
-                    
-                except Exception as e:
-                    errores.append(f"Error en {info['categoria']} {info['grupo']}: {str(e)}")
-        
-        # Si todavía no hay datos, usar fallback
-        if not todos_jugadores:
-            todos_jugadores = generar_datos_fallback()
-            return {
-                "jugadores": [jugador.dict() for jugador in todos_jugadores],
-                "usando_fallback": True,
-                "errores": errores
-            }
+        raise HTTPException(status_code=500, detail="No se pudieron extraer datos de ninguna URL")
     
     return {
         "jugadores": [jugador.dict() for jugador in todos_jugadores],
-        "usando_fallback": False,
         "errores": errores if errores else None
     }
 
