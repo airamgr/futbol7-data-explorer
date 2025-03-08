@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests
@@ -148,130 +149,195 @@ def extraer_jugadores_de_html(html: str, url: str) -> List[Jugador]:
     soup = BeautifulSoup(html, 'html.parser')
     
     # Guardar HTML para depuración si es necesario
-    with open(f"debug_{categoria}_{grupo}.html", "w", encoding="utf-8") as f:
-        f.write(html)
+    # with open(f"debug_{categoria}_{grupo}.html", "w", encoding="utf-8") as f:
+    #    f.write(html)
     
     print(f"Analizando HTML para {categoria} {grupo}...")
     
-    # Enfoque 1: Buscar tablas con ciertas clases o IDs
-    tables = soup.find_all('table', class_=lambda c: c and ('table' in c.lower() or 'data' in c.lower()))
-    if not tables:
-        tables = soup.find_all('table')
+    # Buscar todas las tablas del documento
+    tables = soup.find_all('table')
     
     print(f"Encontradas {len(tables)} tablas potenciales")
     
     # Para cada tabla encontrada
     for idx, tabla in enumerate(tables):
         print(f"Analizando tabla {idx+1}/{len(tables)}")
-        filas = tabla.find_all('tr')
         
+        # Verificar que la tabla tiene filas
+        filas = tabla.find_all('tr')
         if len(filas) < 2:
             print(f"  Tabla {idx+1} tiene menos de 2 filas, saltando...")
             continue
         
-        # Analizar las cabeceras para identificar las columnas
-        cabeceras = [th.get_text(strip=True).lower() for th in filas[0].find_all(['th', 'td'])]
+        # Obtener todas las cabeceras
+        cabeceras = []
+        primera_fila = filas[0]
+        cabeceras_elementos = primera_fila.find_all(['th', 'td'])
+        for elem in cabeceras_elementos:
+            cabecera = elem.get_text(strip=True).lower()
+            cabeceras.append(cabecera)
+        
         print(f"  Cabeceras encontradas: {cabeceras}")
         
-        # Si no hay cabeceras claras, intentamos inferir la estructura
-        if not cabeceras or all(not header for header in cabeceras):
-            print(f"  No se encontraron cabeceras claras, utilizando estructura inferida")
-            # Asumir estructura simple: posición, jugador, equipo, goles
-            indice_nombre = 1
-            indice_equipo = 2
-            indice_goles = 3
-        else:
-            # Buscar índices para las columnas relevantes
-            indice_nombre = next((i for i, h in enumerate(cabeceras) if 'jugador' in h or 'nombre' in h), -1)
-            indice_equipo = next((i for i, h in enumerate(cabeceras) if 'equipo' in h or 'club' in h), -1)
-            indice_goles = next((i for i, h in enumerate(cabeceras) if 'goles' in h or 'gol' in h), -1)
-            
-            # Si no se encuentran las columnas, usar heurística
-            if indice_nombre == -1:
-                indice_nombre = 1 if len(cabeceras) > 1 else 0
-            if indice_equipo == -1:
-                indice_equipo = 2 if len(cabeceras) > 2 else 1
-            if indice_goles == -1:
-                indice_goles = 3 if len(cabeceras) > 3 else 2
+        # Identificar índices de columnas basado en las cabeceras
+        indice_jugador = -1
+        indice_equipo = -1
+        indice_grupo = -1
+        indice_partidos = -1
+        indice_goles = -1
         
-        print(f"  Usando columnas: nombre={indice_nombre}, equipo={indice_equipo}, goles={indice_goles}")
+        # Buscar índices de cada columna
+        for i, cabecera in enumerate(cabeceras):
+            if cabecera in ['jugador', 'nombre']:
+                indice_jugador = i
+            elif cabecera in ['equipo', 'club']:
+                indice_equipo = i
+            elif cabecera in ['grupo', 'categoría', 'categoria', 'division']:
+                indice_grupo = i
+            elif 'partidos' in cabecera or 'jugados' in cabecera:
+                indice_partidos = i
+            elif cabecera in ['goles', 'total']:
+                indice_goles = i
         
-        # Procesar las filas de datos (saltamos la primera que es cabecera)
+        # Si no encontramos las columnas necesarias, intenta usar posiciones fijas basadas en el ejemplo
+        if indice_jugador == -1 or indice_equipo == -1 or indice_goles == -1:
+            print("  No se encontraron cabeceras estándar, usando layout basado en el ejemplo...")
+            # Basado en la imagen de ejemplo:
+            if len(cabeceras) >= 5:
+                indice_jugador = 0
+                indice_equipo = 1
+                indice_grupo = 2
+                indice_partidos = 3
+                indice_goles = 4
+        
+        # Verificar que hemos identificado al menos las columnas esenciales
+        if indice_jugador == -1 or indice_equipo == -1 or indice_goles == -1:
+            print("  No se pudieron identificar las columnas esenciales, saltando tabla...")
+            continue
+        
+        print(f"  Usando columnas: jugador={indice_jugador}, equipo={indice_equipo}, " +
+              f"grupo={indice_grupo}, partidos={indice_partidos}, goles={indice_goles}")
+        
+        # Procesar las filas de datos (saltando la primera que es cabecera)
+        jugadores_tabla = []
         for i in range(1, len(filas)):
             fila = filas[i]
             celdas = fila.find_all('td')
             
-            # Verificar que la fila tiene suficientes celdas
-            if len(celdas) <= max(indice_nombre, indice_equipo, indice_goles):
+            # Verificar que hay suficientes celdas
+            if len(celdas) <= max(indice_jugador, indice_equipo, indice_goles):
                 continue
             
             # Extraer datos
-            nombre_raw = celdas[indice_nombre].get_text(strip=True)
+            nombre_raw = celdas[indice_jugador].get_text(strip=True)
             equipo_raw = celdas[indice_equipo].get_text(strip=True)
-            goles_raw = celdas[indice_goles].get_text(strip=True) or '0'
             
-            # Limpiar datos
+            # Extraer goles y partidos jugados si están disponibles
+            goles_raw = celdas[indice_goles].get_text(strip=True) if indice_goles >= 0 and indice_goles < len(celdas) else '0'
+            partidos_raw = celdas[indice_partidos].get_text(strip=True) if indice_partidos >= 0 and indice_partidos < len(celdas) else None
+            
+            # Limpiar y convertir datos
             nombre = re.sub(r'\s+', ' ', nombre_raw).strip()
             equipo = re.sub(r'\s+', ' ', equipo_raw).strip()
-            goles = int(''.join(filter(str.isdigit, goles_raw)) or 0)
             
-            # Solo añadimos jugadores válidos
+            # Extraer solo dígitos para goles
+            goles_str = ''.join(filter(str.isdigit, goles_raw))
+            goles = int(goles_str) if goles_str else 0
+            
+            # Extraer solo dígitos para partidos
+            partidos_jugados = None
+            if partidos_raw:
+                partidos_str = ''.join(filter(str.isdigit, partidos_raw))
+                partidos_jugados = int(partidos_str) if partidos_str else None
+            
+            # Validar que tenemos datos mínimos válidos
             if nombre and len(nombre) > 2 and equipo and len(equipo) > 2:
-                # Creamos un ID único
+                # Generar ID único
                 id_jugador = f"{categoria}-{grupo}-{nombre}-{equipo}"
                 
-                # Añadimos el jugador a la lista
-                jugadores.append(Jugador(
+                # Crear objeto jugador
+                jugador = Jugador(
                     id=id_jugador,
                     nombre=nombre,
                     equipo=equipo,
                     categoria=categoria,
                     goles=goles,
-                    partidosJugados=goles,  # Usamos los goles como aproximación
-                    fechaNacimiento=None    # No tenemos esta información
-                ))
-                print(f"  Jugador añadido: {nombre} ({equipo}) - {goles} goles")
+                    partidosJugados=partidos_jugados
+                )
+                
+                jugadores_tabla.append(jugador)
+                print(f"  Jugador añadido: {nombre} ({equipo}) - Goles: {goles}, Partidos: {partidos_jugados}")
+        
+        # Si encontramos jugadores en esta tabla, asumimos que es la tabla correcta y terminamos
+        if jugadores_tabla:
+            print(f"  Encontrados {len(jugadores_tabla)} jugadores en esta tabla, asumiendo que es la correcta")
+            jugadores.extend(jugadores_tabla)
+            break
     
-    # Si no hemos encontrado jugadores con el método anterior, probar un enfoque alternativo
+    # Si no encontramos jugadores, intentar un enfoque alternativo buscando patrones específicos
     if not jugadores:
-        print("Intentando método alternativo de extracción...")
-        # Buscar directamente filas de datos (suponiendo que pueden estar en cualquier tabla)
-        all_rows = soup.find_all('tr')
-        for row in all_rows:
-            cells = row.find_all('td')
-            if len(cells) >= 3:  # Al menos necesitamos 3 celdas: nombre, equipo y goles
+        print("  No se encontraron jugadores con el método principal, intentando método alternativo...")
+        # Buscar tablas con clases específicas o con estructuras similares a la de la imagen
+        candidatas = soup.find_all('table', class_=lambda c: c and ('listados' in c.lower() or 'datos' in c.lower() or 'goleadores' in c.lower()))
+        if not candidatas:
+            candidatas = tables  # Si no hay candidatas específicas, probar con todas las tablas
+        
+        for tabla in candidatas:
+            filas = tabla.find_all('tr')
+            if len(filas) < 2:
+                continue
+            
+            print(f"  Intentando extraer datos de tabla alternativa con {len(filas)} filas")
+            
+            # Procesar solo las filas de datos (ignorar la primera fila que suele ser cabecera)
+            for i in range(1, len(filas)):
+                fila = filas[i]
+                celdas = fila.find_all('td')
+                
+                # Verificar que hay suficientes celdas (al menos necesitamos 3: nombre, equipo, goles)
+                if len(celdas) < 3:
+                    continue
+                
                 try:
-                    # Intentar extraer datos (el orden puede variar)
-                    if len(cells) >= 4:
-                        # Formato más común: posición, nombre, equipo, goles
-                        nombre = cells[1].get_text(strip=True)
-                        equipo = cells[2].get_text(strip=True)
-                        goles_str = cells[3].get_text(strip=True)
-                    else:
-                        # Formato mínimo: nombre, equipo, goles
-                        nombre = cells[0].get_text(strip=True)
-                        equipo = cells[1].get_text(strip=True)
-                        goles_str = cells[2].get_text(strip=True)
+                    # Suponiendo una estructura basada en la imagen de ejemplo:
+                    # Jugador, Equipo, Grupo, Partidos Jugados, Goles, Goles por partido
+                    nombre = celdas[0].get_text(strip=True) if len(celdas) > 0 else ""
+                    equipo = celdas[1].get_text(strip=True) if len(celdas) > 1 else ""
+                    # Grupo viene de la URL, así que lo omitimos
+                    partidos_str = celdas[3].get_text(strip=True) if len(celdas) > 3 else ""
+                    goles_str = celdas[4].get_text(strip=True) if len(celdas) > 4 else ""
                     
-                    # Intentar extraer el número de goles
-                    goles = int(''.join(filter(str.isdigit, goles_str)) or 0)
+                    # Limpiar datos
+                    nombre = re.sub(r'\s+', ' ', nombre).strip()
+                    equipo = re.sub(r'\s+', ' ', equipo).strip()
                     
-                    # Verificar validez de los datos
+                    # Extraer números
+                    partidos_jugados = int(''.join(filter(str.isdigit, partidos_str))) if partidos_str else None
+                    goles = int(''.join(filter(str.isdigit, goles_str))) if goles_str else 0
+                    
+                    # Validar datos mínimos
                     if nombre and len(nombre) > 2 and equipo and len(equipo) > 2:
                         id_jugador = f"{categoria}-{grupo}-{nombre}-{equipo}"
-                        jugadores.append(Jugador(
+                        
+                        jugador = Jugador(
                             id=id_jugador,
                             nombre=nombre,
                             equipo=equipo,
                             categoria=categoria,
                             goles=goles,
-                            partidosJugados=goles,  # Usamos los goles como aproximación
-                            fechaNacimiento=None    # No tenemos esta información
-                        ))
-                        print(f"  Método alternativo: Jugador añadido: {nombre} ({equipo}) - {goles} goles")
+                            partidosJugados=partidos_jugados
+                        )
+                        
+                        jugadores.append(jugador)
+                        print(f"  Método alternativo: Jugador añadido: {nombre} ({equipo}) - Goles: {goles}, Partidos: {partidos_jugados}")
                 except Exception as e:
-                    print(f"  Error al procesar fila alternativa: {e}")
+                    print(f"  Error procesando fila alternativa: {e}")
+            
+            # Si encontramos jugadores con este método, salimos del bucle
+            if jugadores:
+                break
     
+    print(f"Total jugadores encontrados para {categoria} {grupo}: {len(jugadores)}")
     # Ordenar por número de goles de mayor a menor
     return sorted(jugadores, key=lambda x: x.goles, reverse=True)
 
