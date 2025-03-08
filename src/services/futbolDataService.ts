@@ -1,4 +1,3 @@
-
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -211,6 +210,17 @@ export const extraerTodosLosDatos = async (auth: { username: string; password: s
       
       const data = await response.json();
       console.log("Datos extraídos correctamente:", data);
+      
+      if (!data.jugadores || data.jugadores.length === 0) {
+        console.warn("La respuesta del servidor no contiene jugadores o está vacía");
+        
+        if (data.errores && data.errores.length > 0) {
+          console.error("Errores reportados por el servidor:", data.errores);
+          throw new Error(`No se pudieron extraer datos: ${data.errores[0]}`);
+        }
+        
+        throw new Error("El servidor devolvió una respuesta vacía. Es posible que la estructura de la página haya cambiado.");
+      }
       
       // Añadimos un timestamp de última actualización
       const jugadoresConTimestamp = data.jugadores.map((j: Jugador) => ({
