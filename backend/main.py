@@ -6,8 +6,6 @@ from bs4 import BeautifulSoup
 import json
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import random
-from datetime import datetime, timedelta
 import re
 import time
 
@@ -105,29 +103,6 @@ URLS_DATOS = [
     }
 ]
 
-# Función auxiliar para generar fechas de nacimiento según la categoría
-def generar_fecha_nacimiento_aleatoria(categoria: str) -> str:
-    # Asignamos edades según categoría
-    rango_edad_min = 6
-    rango_edad_max = 12
-    
-    if categoria == "Prebenjamín":
-        rango_edad_min = 6
-        rango_edad_max = 8
-    elif categoria == "Benjamín":
-        rango_edad_min = 8
-        rango_edad_max = 10
-    elif categoria == "Alevín":
-        rango_edad_min = 10
-        rango_edad_max = 12
-    
-    actual_year = datetime.now().year
-    birth_year = actual_year - (rango_edad_min + random.randint(0, rango_edad_max - rango_edad_min))
-    birth_month = random.randint(1, 12)
-    birth_day = random.randint(1, 28)
-    
-    return f"{birth_year}-{birth_month:02d}-{birth_day:02d}"
-
 # Headers y cookies para simular un navegador real
 BROWSER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -149,11 +124,11 @@ BROWSER_HEADERS = {
 
 # Un conjunto de cookies comunes para sitios web españoles
 DEFAULT_COOKIES = {
-    "cookiesession1": f"678B3E3{random.randint(10000, 99999)}ABCDEFGHIJKLMN",
-    "JSESSIONID": f"node01{random.randint(100000, 999999)}abc{random.randint(100000, 999999)}",
+    "cookiesession1": f"678B3E3{requests.utils.random_port()}ABCDEFGHIJKLMN",
+    "JSESSIONID": f"node01{requests.utils.random_port()}abc{requests.utils.random_port()}",
     "consent": "true",
     "gdpr_consent": "1",
-    "visitor_id": f"{random.randint(100000, 999999)}"
+    "visitor_id": f"{requests.utils.random_port()}"
 }
 
 # Función mejorada para extraer datos de una URL utilizando BeautifulSoup
@@ -169,7 +144,7 @@ def extraer_jugadores_de_html(html: str, url: str) -> List[Jugador]:
     grupo = info_url["grupo"]
     
     # Crear un soup para analizar el HTML
-    soup = BeautifulSoup(html, 'lxml')
+    soup = BeautifulSoup(html, 'html.parser')
     
     # Guardar HTML para depuración si es necesario
     with open(f"debug_{categoria}_{grupo}.html", "w", encoding="utf-8") as f:
@@ -251,8 +226,8 @@ def extraer_jugadores_de_html(html: str, url: str) -> List[Jugador]:
                     equipo=equipo,
                     categoria=categoria,
                     goles=goles,
-                    partidosJugados=goles + random.randint(0, 10),
-                    fechaNacimiento=generar_fecha_nacimiento_aleatoria(categoria)
+                    partidosJugados=goles,  # Usamos los goles como aproximación
+                    fechaNacimiento=None    # No tenemos esta información
                 ))
                 print(f"  Jugador añadido: {nombre} ({equipo}) - {goles} goles")
     
@@ -289,34 +264,12 @@ def extraer_jugadores_de_html(html: str, url: str) -> List[Jugador]:
                             equipo=equipo,
                             categoria=categoria,
                             goles=goles,
-                            partidosJugados=goles + random.randint(0, 10),
-                            fechaNacimiento=generar_fecha_nacimiento_aleatoria(categoria)
+                            partidosJugados=goles,  # Usamos los goles como aproximación
+                            fechaNacimiento=None    # No tenemos esta información
                         ))
                         print(f"  Método alternativo: Jugador añadido: {nombre} ({equipo}) - {goles} goles")
                 except Exception as e:
                     print(f"  Error al procesar fila alternativa: {e}")
-    
-    # En caso de que no se encuentren jugadores, podemos crear datos de ejemplo
-    if not jugadores:
-        print(f"No se encontraron jugadores para {categoria} {grupo}, generando datos de ejemplo")
-        # Generar datos de ejemplo
-        equipos = ["Real CD", "AD Municipal", "CF San José", "UD Esperanza", "Atlético Regional"]
-        for i in range(10):
-            nombre = f"Jugador{i+1} {categoria[:3]}{grupo[-1]}"
-            equipo = random.choice(equipos)
-            goles = random.randint(0, 15)
-            
-            id_jugador = f"{categoria}-{grupo}-{nombre}-{equipo}"
-            jugadores.append(Jugador(
-                id=id_jugador,
-                nombre=nombre,
-                equipo=equipo,
-                categoria=categoria,
-                goles=goles,
-                partidosJugados=goles + random.randint(0, 10),
-                fechaNacimiento=generar_fecha_nacimiento_aleatoria(categoria)
-            ))
-            print(f"  Datos de ejemplo: Jugador añadido: {nombre} ({equipo}) - {goles} goles")
     
     # Ordenar por número de goles de mayor a menor
     return sorted(jugadores, key=lambda x: x.goles, reverse=True)
@@ -356,8 +309,6 @@ def extraer_datos(credenciales: CredencialesModel):
         print(f"Cookies obtenidas: {dict(session.cookies)}")
     except Exception as e:
         print(f"Error al inicializar sesión: {str(e)}")
-    
-    # Añadir una pausa entre solicitudes para no sobrecargar el servidor
     
     # Recorremos todas las URLs para extraer datos
     for i, info in enumerate(URLS_DATOS):
