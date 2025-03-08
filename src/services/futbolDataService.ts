@@ -95,27 +95,48 @@ const API_BASE_URL = import.meta.env.DEV
   ? 'http://localhost:8000' 
   : 'https://tu-backend-en-produccion.com';
 
+// Control de reintentos y tiempos de espera
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 segundos entre reintentos
+
 // Función para verificar que el backend está disponible
 export const verificarBackendDisponible = async (): Promise<boolean> => {
-  try {
-    console.log('Verificando disponibilidad del backend en:', API_BASE_URL);
-    const response = await fetch(`${API_BASE_URL}/`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      cache: 'no-store'
-    });
-    
-    if (response.ok) {
-      console.log('Backend disponible, respuesta:', await response.text());
+  let retries = 0;
+  
+  while (retries < MAX_RETRIES) {
+    try {
+      console.log(`Verificando disponibilidad del backend en: ${API_BASE_URL} (intento ${retries + 1}/${MAX_RETRIES})`);
+      
+      const response = await fetch(`${API_BASE_URL}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        cache: 'no-store'
+      });
+      
+      if (response.ok) {
+        console.log('Backend disponible, respuesta:', await response.text());
+        return true;
+      }
+      
+      console.warn(`Intento ${retries + 1} falló con status: ${response.status}`);
+      
+    } catch (error) {
+      console.error(`Error al verificar disponibilidad (intento ${retries + 1}):`, error);
     }
     
-    return response.ok;
-  } catch (error) {
-    console.error('Error al verificar disponibilidad del backend:', error);
-    return false;
+    retries++;
+    
+    if (retries < MAX_RETRIES) {
+      console.log(`Esperando ${RETRY_DELAY/1000} segundos antes del siguiente intento...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+    }
   }
+  
+  console.error(`Agotados ${MAX_RETRIES} intentos. El backend no está disponible.`);
+  return false;
 };
 
 // Nueva función para verificar credenciales
@@ -143,55 +164,78 @@ export const verificarCredenciales = async (auth: { username: string; password: 
 
 // Nueva función para extraer todos los datos usando el backend de Python
 export const extraerTodosLosDatos = async (auth: { username: string; password: string }): Promise<Jugador[]> => {
-  try {
-    console.log("Iniciando extracción de datos con credenciales:", auth.username, auth.password);
-    
-    // Verificamos la disponibilidad del backend
-    const backendDisponible = await verificarBackendDisponible();
-    
-    if (!backendDisponible) {
-      console.error("El backend de Python no está disponible");
-      throw new Error("El servidor backend no está disponible. Asegúrate de que está en ejecución en http://localhost:8000");
-    }
-    
-    // Hacemos la solicitud al endpoint de extracción
-    console.log("Enviando solicitud a /extraer-datos");
-    const response = await fetch(`${API_BASE_URL}/extraer-datos`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(auth)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error del servidor (${response.status}): ${errorText}`);
+  let retries = 0;
+  
+  while (retries < MAX_RETRIES) {
+    try {
+      console.log(`Iniciando extracción de datos (intento ${retries + 1}/${MAX_RETRIES})`);
+      console.log("Credenciales:", auth.username, "****");
       
-      try {
-        // Intentamos parsear el error como JSON
-        const errorData = JSON.parse(errorText);
-        const errorMessage = errorData.detail || `Error ${response.status}: ${response.statusText}`;
-        throw new Error(errorMessage);
-      } catch (parseError) {
-        // Si no podemos parsear como JSON, usamos el texto tal cual
-        if (response.status === 500) {
-          throw new Error(`Error 500: Error interno del servidor Python. Revisa los logs para más detalles.`);
-        } else {
-          throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+      // Verificamos la disponibilidad del backend
+      const backendDisponible = await verificarBackendDisponible();
+      
+      if (!backendDisponible) {
+        console.error("El backend de Python no está disponible");
+        throw new Error("El servidor backend no está disponible. Asegúrate de que está en ejecución en http://localhost:8000");
+      }
+      
+      // Hacemos la solicitud al endpoint de extracción
+      console.log("Enviando solicitud a /extraer-datos");
+      const response = await fetch(`${API_BASE_URL}/extraer-datos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        body: JSON.stringify(auth)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error del servidor (${response.status}): ${errorText}`);
+        
+        try {
+          // Intentamos parsear el error como JSON
+          const errorData = JSON.parse(errorText);
+          const errorMessage = errorData.detail || `Error ${response.status}: ${response.statusText}`;
+          throw new Error(errorMessage);
+        } catch (parseError) {
+          // Si no podemos parsear como JSON, usamos el texto tal cual
+          if (response.status === 500) {
+            throw new Error(`Error 500: Error interno del servidor Python. Revisa los logs para más detalles.`);
+          } else {
+            throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+          }
         }
       }
+      
+      const data = await response.json();
+      console.log("Datos extraídos correctamente:", data);
+      
+      // Añadimos un timestamp de última actualización
+      const jugadoresConTimestamp = data.jugadores.map((j: Jugador) => ({
+        ...j,
+        lastUpdated: new Date().toISOString()
+      }));
+      
+      // Convertimos los datos a nuestro formato
+      return jugadoresConTimestamp as Jugador[];
+    } catch (error) {
+      console.error(`Error extrayendo datos (intento ${retries + 1}):`, error);
+      
+      retries++;
+      
+      if (retries < MAX_RETRIES) {
+        console.log(`Esperando ${RETRY_DELAY/1000} segundos antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      } else {
+        console.error(`Agotados ${MAX_RETRIES} intentos. Error crítico:`, error);
+        throw error; // Propagamos el error después de agotar reintentos
+      }
     }
-    
-    const data = await response.json();
-    console.log("Datos extraídos correctamente:", data);
-    
-    // Convertimos los datos a nuestro formato
-    return data.jugadores as Jugador[];
-  } catch (error) {
-    console.error("Error crítico extrayendo todos los datos:", error);
-    throw error; // Propagamos el error para que sea manejado por el hook
   }
+  
+  throw new Error(`No se pudieron extraer datos después de ${MAX_RETRIES} intentos`);
 };
 
 // Función para aplicar filtros a los jugadores

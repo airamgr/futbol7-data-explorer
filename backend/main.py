@@ -125,6 +125,34 @@ def generar_fecha_nacimiento_aleatoria(categoria: str) -> str:
     
     return f"{birth_year}-{birth_month:02d}-{birth_day:02d}"
 
+# Headers y cookies para simular un navegador real
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Cache-Control": "max-age=0",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Sec-Ch-Ua": '"Chromium";v="122", "Google Chrome";v="122", "Not(A:Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "DNT": "1"
+}
+
+# Un conjunto de cookies comunes para sitios web españoles
+DEFAULT_COOKIES = {
+    "cookiesession1": f"678B3E3{random.randint(10000, 99999)}ABCDEFGHIJKLMN",
+    "JSESSIONID": f"node01{random.randint(100000, 999999)}abc{random.randint(100000, 999999)}",
+    "consent": "true",
+    "gdpr_consent": "1",
+    "visitor_id": f"{random.randint(100000, 999999)}"
+}
+
 # Función para extraer datos de una URL utilizando BeautifulSoup
 def extraer_jugadores_de_html(html: str, url: str) -> List[Jugador]:
     jugadores = []
@@ -229,34 +257,74 @@ def extraer_datos(credenciales: CredencialesModel):
     
     todos_jugadores = []
     errores = []
+    session = requests.Session()
+    
+    # Establecer una sesión con cookies y headers consistentes
+    session.headers.update(BROWSER_HEADERS)
+    session.cookies.update(DEFAULT_COOKIES)
+    
+    # Primero hacer una petición a la página principal para obtener cookies de sesión
+    try:
+        print("Inicializando sesión con la página principal...")
+        index_url = "https://intranet.rfcylf.es/"
+        session.get(
+            index_url,
+            timeout=15
+        )
+        print(f"Cookies obtenidas: {dict(session.cookies)}")
+    except Exception as e:
+        print(f"Error al inicializar sesión: {str(e)}")
+    
+    # Añadir una pausa entre solicitudes para no sobrecargar el servidor
+    import time
     
     # Recorremos todas las URLs para extraer datos
-    for info in URLS_DATOS:
+    for i, info in enumerate(URLS_DATOS):
         try:
-            # Usamos requests para obtener el HTML directamente (sin problemas de CORS)
-            response = requests.get(
+            print(f"Procesando {i+1}/{len(URLS_DATOS)}: {info['categoria']} {info['grupo']}")
+            
+            # Pausa para evitar sobrecarga
+            if i > 0:
+                print("Esperando 2 segundos antes de la siguiente solicitud...")
+                time.sleep(2)
+            
+            # Añadimos un referer y origen que coincida con la url de destino
+            current_headers = session.headers.copy()
+            current_headers["Referer"] = "https://intranet.rfcylf.es/"
+            current_headers["Origin"] = "https://intranet.rfcylf.es"
+            
+            # Usamos session para mantener cookies y headers consistentes
+            response = session.get(
                 info["url"],
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                },
-                timeout=10
+                headers=current_headers,
+                timeout=20
             )
             
+            print(f"Respuesta: {response.status_code}")
+            
             if response.status_code != 200:
-                errores.append(f"Error {response.status_code} en {info['categoria']} {info['grupo']}")
+                error_msg = f"Error {response.status_code} en {info['categoria']} {info['grupo']}"
+                print(error_msg)
+                errores.append(error_msg)
                 continue
                 
             # Extraer jugadores del HTML
             html = response.text
             jugadores = extraer_jugadores_de_html(html, info["url"])
+            print(f"Encontrados {len(jugadores)} jugadores en {info['categoria']} {info['grupo']}")
             todos_jugadores.extend(jugadores)
             
         except Exception as e:
-            errores.append(f"Error en {info['categoria']} {info['grupo']}: {str(e)}")
+            error_msg = f"Error en {info['categoria']} {info['grupo']}: {str(e)}"
+            print(error_msg)
+            errores.append(error_msg)
     
     # Si no pudimos obtener datos, devolvemos error
     if not todos_jugadores:
-        raise HTTPException(status_code=500, detail="No se pudieron extraer datos de ninguna URL")
+        print("ERROR: No se pudieron extraer datos de ninguna URL")
+        raise HTTPException(status_code=500, detail="No se pudieron extraer datos de ninguna URL. Revisa los logs para más detalles.")
+    
+    print(f"Proceso completado. Total de jugadores: {len(todos_jugadores)}, Errores: {len(errores)}")
     
     return {
         "jugadores": [jugador.dict() for jugador in todos_jugadores],
