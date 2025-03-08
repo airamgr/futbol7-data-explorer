@@ -1,5 +1,6 @@
 
-import { Database, ServerCrash, Terminal } from 'lucide-react';
+import { Database, ServerCrash, Terminal, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const Footer = () => {
   return (
@@ -18,28 +19,72 @@ const Footer = () => {
             </p>
           </div>
         </div>
-        <div className="mt-4 text-center text-xs text-slate-500">
-          <p>Supabase está conectado. Ahora necesitas iniciar el backend Python y resolver cualquier error de extracción.</p>
-          <p className="font-mono mt-1 bg-slate-800 p-1 rounded">cd backend && uvicorn main:app --reload</p>
-          <div className="mt-2 bg-slate-800 p-2 rounded-md text-left">
-            <p className="text-orange-400 flex items-center">
-              <ServerCrash className="h-3 w-3 mr-1" />
-              Error 500 en el backend
-            </p>
-            <p className="text-slate-400 mt-1 text-xs">
-              Si ves un error 500, revisa estos detalles en la terminal donde ejecutas Python:
-            </p>
-            <ul className="text-slate-400 mt-1 text-xs list-disc pl-5">
-              <li>Errores de BeautifulSoup al parsear HTML</li>
-              <li>Errores de conexión con las URLs de las categorías de fútbol</li>
-              <li>Errores de autenticación (credenciales incorrectas)</li>
-              <li>Excepciones no controladas en el código Python</li>
-            </ul>
-            <p className="flex items-center text-slate-400 mt-2 text-xs">
-              <Terminal className="h-3 w-3 mr-1 text-green-400" />
-              Busca la línea que dice <span className="font-mono bg-slate-900 px-1">ERROR:</span> en tus logs de Python
-            </p>
-          </div>
+        
+        <div className="mt-6">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="debug-guide" className="border-t border-slate-800">
+              <AccordionTrigger className="py-2 text-sm text-slate-400 hover:text-slate-300">
+                <div className="flex items-center">
+                  <Terminal className="h-4 w-4 mr-2 text-green-400" />
+                  <span>Guía de depuración y solución de errores</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="text-xs text-slate-400 space-y-4">
+                <div className="bg-slate-800 p-3 rounded-md">
+                  <p className="text-orange-400 flex items-center mb-2">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    <span className="font-medium">Cómo iniciar el backend Python</span>
+                  </p>
+                  <div className="bg-slate-900 p-2 rounded font-mono text-green-400 mb-2">
+                    <p>cd backend</p>
+                    <p>uvicorn main:app --reload</p>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    El servidor se iniciará en <span className="font-mono bg-slate-900 px-1">http://localhost:8000</span>
+                  </p>
+                </div>
+                
+                <div className="bg-slate-800 p-3 rounded-md">
+                  <p className="text-orange-400 flex items-center mb-2">
+                    <ServerCrash className="h-3 w-3 mr-1" />
+                    <span className="font-medium">Cómo resolver errores 500 del backend</span>
+                  </p>
+                  <ol className="list-decimal pl-5 space-y-1">
+                    <li>
+                      Busca en los logs de la terminal mensajes que empiecen con <span className="font-mono bg-slate-900 px-1 text-red-400">ERROR:</span>
+                    </li>
+                    <li>
+                      Identifica errores comunes:
+                      <ul className="list-disc pl-5 mt-1">
+                        <li><span className="text-orange-400">BeautifulSoup</span>: Problemas al parsear el HTML de la web</li>
+                        <li><span className="text-orange-400">Credentials</span>: Credenciales incorrectas (usuario/contraseña)</li>
+                        <li><span className="text-orange-400">Connection</span>: Problemas de conexión con URLs o servidores</li>
+                        <li><span className="text-orange-400">Import Error</span>: Librerías Python faltantes</li>
+                      </ul>
+                    </li>
+                    <li>
+                      Si no encuentras el error, ejecuta Python en modo detallado:
+                      <div className="bg-slate-900 p-1 mt-1 rounded font-mono">
+                        <p>python -u backend/main.py</p>
+                      </div>
+                    </li>
+                    <li>
+                      Después de corregir el error, reinicia el servidor y actualiza los datos en la aplicación
+                      <div className="flex items-center mt-1">
+                        <ArrowRight className="h-3 w-3 mr-1 text-green-400" />
+                        <span>El botón "Actualizar datos" en la parte superior de la página</span>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+                
+                <div className="text-center mt-2 text-xs">
+                  <p>Una vez que el backend esté funcionando correctamente, los datos se almacenarán en Supabase</p>
+                  <p className="mt-1">Después de la primera carga exitosa, podrás ver los datos incluso sin el backend en ejecución</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </div>
     </footer>
