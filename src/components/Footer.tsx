@@ -1,5 +1,5 @@
 
-import { Database, ServerCrash } from 'lucide-react';
+import { Database, ServerCrash, Terminal } from 'lucide-react';
 
 const Footer = () => {
   return (
@@ -21,10 +21,25 @@ const Footer = () => {
         <div className="mt-4 text-center text-xs text-slate-500">
           <p>Supabase está conectado. Ahora necesitas iniciar el backend Python y resolver cualquier error de extracción.</p>
           <p className="font-mono mt-1 bg-slate-800 p-1 rounded">cd backend && uvicorn main:app --reload</p>
-          <p className="mt-2 text-orange-400 flex items-center justify-center">
-            <ServerCrash className="h-3 w-3 mr-1" />
-            Si ves un error 500, revisa los logs de Python para detalles del error de extracción
-          </p>
+          <div className="mt-2 bg-slate-800 p-2 rounded-md text-left">
+            <p className="text-orange-400 flex items-center">
+              <ServerCrash className="h-3 w-3 mr-1" />
+              Error 500 en el backend
+            </p>
+            <p className="text-slate-400 mt-1 text-xs">
+              Si ves un error 500, revisa estos detalles en la terminal donde ejecutas Python:
+            </p>
+            <ul className="text-slate-400 mt-1 text-xs list-disc pl-5">
+              <li>Errores de BeautifulSoup al parsear HTML</li>
+              <li>Errores de conexión con las URLs de las categorías de fútbol</li>
+              <li>Errores de autenticación (credenciales incorrectas)</li>
+              <li>Excepciones no controladas en el código Python</li>
+            </ul>
+            <p className="flex items-center text-slate-400 mt-2 text-xs">
+              <Terminal className="h-3 w-3 mr-1 text-green-400" />
+              Busca la línea que dice <span className="font-mono bg-slate-900 px-1">ERROR:</span> en tus logs de Python
+            </p>
+          </div>
         </div>
       </div>
     </footer>

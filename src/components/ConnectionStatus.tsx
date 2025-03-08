@@ -1,5 +1,5 @@
 
-import { AlertTriangle, WifiOff, Database, ServerCrash } from 'lucide-react';
+import { AlertTriangle, WifiOff, Database, ServerCrash, FileText } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 
@@ -13,6 +13,7 @@ const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) =
   const isSupabaseError = error?.includes('Supabase') || error?.includes('supabase');
   const isBackendError = error?.includes('backend') || error?.includes('Backend') || error?.includes('Python');
   const isExtractionError = error?.includes('extraer') || error?.includes('No se pudieron extraer');
+  const isServerError500 = error?.includes('500') || error?.includes('Error 500');
   
   if (!error && backendDisponible !== false) return null;
   
@@ -35,7 +36,31 @@ const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) =
           </div>
         )}
         
-        {isExtractionError && (
+        {isServerError500 && (
+          <div className="mt-2 p-2 bg-red-50 rounded-md text-sm">
+            <p className="font-semibold flex items-center">
+              <ServerCrash className="h-4 w-4 mr-1" /> 
+              Error 500 del servidor Python
+            </p>
+            <p className="text-xs mt-1">
+              El servidor Python ha devuelto un error interno 500. Revisa los logs completos del servidor Python en la consola para encontrar el error específico.
+            </p>
+            <p className="text-xs mt-1 font-mono bg-gray-100 p-1 rounded">
+              python -u backend/main.py
+            </p>
+            <p className="text-xs mt-1">
+              Posibles causas:
+              <ul className="list-disc pl-5 mt-1">
+                <li>Error en el scraping de las páginas web</li>
+                <li>Credenciales incorrectas (actualmente se espera: usuario="CE4032", contraseña="9525")</li>
+                <li>Error de conexión con las URLs de origen</li>
+                <li>Excepción no controlada en el código Python</li>
+              </ul>
+            </p>
+          </div>
+        )}
+        
+        {isExtractionError && !isServerError500 && (
           <div className="mt-2 p-2 bg-orange-50 rounded-md text-sm">
             <p className="font-semibold flex items-center">
               <ServerCrash className="h-4 w-4 mr-1" /> 
@@ -57,6 +82,19 @@ const ConnectionStatus = ({ error, backendDisponible }: ConnectionStatusProps) =
             Backend no disponible - Ejecuta "uvicorn main:app --reload" en la carpeta backend
           </Badge>
         )}
+        
+        <div className="mt-2 p-2 bg-blue-50 rounded-md text-sm">
+          <p className="font-semibold flex items-center">
+            <FileText className="h-4 w-4 mr-1" /> 
+            Solución recomendada
+          </p>
+          <p className="text-xs mt-1">
+            1. Verifica los logs del servidor Python en la terminal donde lo ejecutaste
+            2. Si ves un error específico, corrige el problema (por ejemplo, URLs incorrectas o credenciales)
+            3. Si es necesario, reinicia el servidor Python con "uvicorn main:app --reload"
+            4. Intenta actualizar los datos nuevamente desde la aplicación
+          </p>
+        </div>
       </AlertDescription>
     </Alert>
   );
