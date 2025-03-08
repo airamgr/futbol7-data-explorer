@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests
@@ -8,6 +7,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import re
 import time
+import random  # Add import for random module
 
 app = FastAPI()
 
@@ -123,12 +123,13 @@ BROWSER_HEADERS = {
 }
 
 # Un conjunto de cookies comunes para sitios web españoles
+# Fixed: Replace requests.utils.random_port() with random.randint(1000, 9999)
 DEFAULT_COOKIES = {
-    "cookiesession1": f"678B3E3{requests.utils.random_port()}ABCDEFGHIJKLMN",
-    "JSESSIONID": f"node01{requests.utils.random_port()}abc{requests.utils.random_port()}",
+    "cookiesession1": f"678B3E3{random.randint(1000, 9999)}ABCDEFGHIJKLMN",
+    "JSESSIONID": f"node01{random.randint(1000, 9999)}abc{random.randint(1000, 9999)}",
     "consent": "true",
     "gdpr_consent": "1",
-    "visitor_id": f"{requests.utils.random_port()}"
+    "visitor_id": f"{random.randint(10000, 99999)}"
 }
 
 # Función mejorada para extraer datos de una URL utilizando BeautifulSoup
