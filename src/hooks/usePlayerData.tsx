@@ -49,6 +49,16 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
       // Procesamos el archivo Excel
       console.log(`Iniciando procesamiento de Excel: ${file.name} (${file.size} bytes, tipo: ${file.type})`);
       
+      // Instalar automáticamente XLSX si es necesario
+      if (!window.XLSX) {
+        try {
+          await import('xlsx');
+          console.log("Librería XLSX cargada correctamente");
+        } catch (err) {
+          console.warn("No se pudo cargar XLSX dinámicamente:", err);
+        }
+      }
+      
       const result = await cargarArchivoExcel(file, authToUse);
       
       if (result.length === 0) {
