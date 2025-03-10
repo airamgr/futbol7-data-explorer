@@ -44,11 +44,16 @@ const Index = () => {
     jugadores, 
     isLoading: dataLoading, 
     error: dataError,
+    debugInfo,
     filtros,
     actualizarFiltros,
     resetearFiltros,
     dataSource,
-    cargarDatosDesdeExcel
+    cargarDatosDesdeExcel,
+    showExcelUploader,
+    setShowExcelUploader,
+    uploadedPlayerCount,
+    fileType
   } = useFootballData({ auth: authCredentials });
   
   // Manejar login
@@ -99,7 +104,7 @@ const Index = () => {
         </AnimatePresence>
         
         {/* Estado de conexión */}
-        <ConnectionStatus error={dataError} />
+        <ConnectionStatus error={dataError} debugInfo={debugInfo} />
         
         {/* Cabecera y controles principales */}
         <PageHeader 
@@ -138,6 +143,7 @@ const Index = () => {
                     isLoading={dataLoading}
                     accept=".xlsx,.xls"
                     maxSize={5}
+                    successCount={uploadedPlayerCount}
                   />
                 </div>
                 {jugadores.length > 0 && (

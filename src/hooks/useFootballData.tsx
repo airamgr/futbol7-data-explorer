@@ -11,6 +11,7 @@ interface UseFootballDataProps {
 export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [showExcelUploader, setShowExcelUploader] = useState(true);
   const [uploadedPlayerCount, setUploadedPlayerCount] = useState<number | undefined>(undefined);
+  const [fileType, setFileType] = useState<string | undefined>(undefined);
   const { toast } = useToast();
   
   const { 
@@ -18,7 +19,8 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     isLoading, 
     error, 
     cargarDatosDesdeExcel, 
-    dataSource 
+    dataSource,
+    debugInfo
   } = usePlayerData(auth);
   
   const { filteredJugadores, filtros, actualizarFiltros, resetearFiltros } = useFilteredPlayers(jugadores);
@@ -38,12 +40,17 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       console.log(`Iniciando carga del archivo: ${file.name}`);
       const result = await cargarDatosDesdeExcel(file, auth);
       
+      // Guardar el tipo de archivo
+      setFileType(file.name.split('.').pop()?.toLowerCase() || '');
+      
       if (result.length === 0) {
         toast({
           title: "Advertencia",
           description: "No se encontraron jugadores en el archivo. Verifica que el formato sea correcto y que contenga datos de jugadores.",
           variant: "destructive"
         });
+        setUploadedPlayerCount(0);
+        setShowExcelUploader(false);
         return false;
       }
       
@@ -78,6 +85,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     jugadores: filteredJugadores,
     isLoading,
     error,
+    debugInfo,
     filtros,
     actualizarFiltros,
     resetearFiltros,
@@ -85,7 +93,8 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     dataSource,
     showExcelUploader,
     setShowExcelUploader,
-    uploadedPlayerCount
+    uploadedPlayerCount,
+    fileType
   };
 };
 

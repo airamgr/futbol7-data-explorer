@@ -1,13 +1,14 @@
 
-import { AlertTriangle, Database, FileSpreadsheet } from 'lucide-react';
+import { AlertTriangle, Database, FileSpreadsheet, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface ConnectionStatusProps {
   error: string | null;
   backendDisponible?: boolean | null;
+  debugInfo?: string[];
 }
 
-const ConnectionStatus = ({ error }: ConnectionStatusProps) => {
+const ConnectionStatus = ({ error, debugInfo }: ConnectionStatusProps) => {
   // Check for different types of errors
   const isSupabaseError = error?.includes('Supabase') || error?.includes('supabase');
   const isExcelError = error?.includes('Excel') || error?.includes('excel') || error?.includes('archivo');
@@ -50,8 +51,24 @@ const ConnectionStatus = ({ error }: ConnectionStatusProps) => {
             </p>
             <p className="text-xs mt-2">
               Intenta con otro archivo Excel que contenga columnas con nombres "Jugador", "Equipo" y "Goles". 
-              O prueba volver a guardarlo con formato .xlsx.
+              O prueba guardarlo como .xlsx usando "Guardar como" en Excel.
             </p>
+          </div>
+        )}
+        
+        {debugInfo && debugInfo.length > 0 && (
+          <div className="mt-2 p-2 bg-blue-50 rounded-md text-sm">
+            <p className="font-semibold flex items-center">
+              <Info className="h-4 w-4 mr-1" />
+              Información de depuración
+            </p>
+            <div className="text-xs mt-1 max-h-40 overflow-y-auto">
+              {debugInfo.map((line, index) => (
+                <div key={index} className="py-1 border-b border-blue-100 last:border-0">
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </AlertDescription>

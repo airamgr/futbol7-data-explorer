@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { 
   Jugador,
@@ -10,6 +11,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
   const [jugadores, setJugadores] = useState<Jugador[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [dataSource, setDataSource] = useState<'supabase' | 'excel' | null>(null);
   const { toast } = useToast();
 
@@ -45,19 +47,36 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
     try {
       setIsLoading(true);
       setError(null);
+      setDebugInfo([]);
+      
+      // Recopilando información sobre el archivo
+      const debugMessages = [
+        `Tipo de archivo: ${file.type}`,
+        `Tamaño: ${(file.size / 1024).toFixed(1)} KB`,
+        `Nombre: ${file.name}`
+      ];
+      
+      setDebugInfo(debugMessages);
       
       // Procesamos el archivo Excel
       console.log(`Iniciando procesamiento de Excel: ${file.name} (${file.size} bytes, tipo: ${file.type})`);
       
-      // Ya no verificamos window.XLSX ya que estamos importando XLSX directamente
-      const result = await cargarArchivoExcel(file, authToUse);
+      // Configuración para capturar mensajes de depuración
+      const handleDebugInfo = (message: string) => {
+        debugMessages.push(message);
+        setDebugInfo([...debugMessages]);
+      };
+      
+      const result = await cargarArchivoExcel(file, authToUse, handleDebugInfo);
       
       if (result.length === 0) {
+        handleDebugInfo("No se encontraron jugadores en el archivo");
         throw new Error('No se pudieron extraer datos del Excel. El archivo no contiene jugadores.');
       }
       
       setJugadores(result);
       setDataSource('excel');
+      handleDebugInfo(`Procesado correctamente: ${result.length} jugadores encontrados`);
       
       toast({
         title: 'Excel procesado correctamente',
@@ -139,6 +158,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
     jugadores,
     isLoading,
     error,
+    debugInfo,
     cargarDatos,
     cargarDatosDesdeExcel,
     dataSource

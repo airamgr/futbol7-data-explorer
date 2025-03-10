@@ -1,3 +1,4 @@
+
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -28,39 +29,41 @@ const extraerCategoriaYGrupo = (contenido: any[][]): { categoria: string; grupo:
   let categoria = "Benjamín"; // Asumimos Benjamín como predeterminado
   let grupo = "Desconocido";
   
-  // Buscar en todas las celdas de las primeras filas
-  for (let i = 0; i < Math.min(5, contenido.length); i++) {
-    for (let j = 0; j < Math.min(5, contenido[i]?.length || 0); j++) {
+  // Buscar en todas las celdas de las primeras filas (ahora ampliamos a más filas)
+  for (let i = 0; i < Math.min(10, contenido.length); i++) {
+    for (let j = 0; j < Math.min(10, contenido[i]?.length || 0); j++) {
       if (contenido[i] && contenido[i][j]) {
         const texto = String(contenido[i][j]).trim();
         
-        // Buscar patrones típicos de categoría y grupo
-        if (texto.includes("Benjamín") || texto.includes("Benjamine")) {
+        // Ampliamos patrones de búsqueda para categorías
+        if (texto.toLowerCase().includes("benjam") || 
+            /benj[aá]m[ií]n/i.test(texto) || 
+            /benjamin/i.test(texto)) {
           categoria = "Benjamín";
           console.log(`Categoría Benjamín detectada en celda [${i}][${j}]: ${texto}`);
           
           // Extraer grupo si está en el mismo texto
-          if (texto.includes("Grupo")) {
+          if (texto.includes("Grupo") || texto.includes("grupo")) {
             const match = texto.match(/Grupo\s+(\w+)/i);
             if (match) {
               grupo = `Grupo ${match[1]}`;
               console.log(`Grupo ${match[1]} detectado en el mismo texto`);
             }
           }
-        } else if (texto.includes("Prebenjamín") || texto.includes("Prebenjamine")) {
+        } else if (texto.toLowerCase().includes("prebenj") || /pre.?benj[aá]m[ií]n/i.test(texto)) {
           categoria = "Prebenjamín";
-        } else if (texto.includes("Alevín") || texto.includes("Alevine")) {
+        } else if (texto.toLowerCase().includes("alev") || /alev[ií]n/i.test(texto)) {
           categoria = "Alevín";
-        } else if (texto.includes("Infantil")) {
+        } else if (texto.toLowerCase().includes("infant") || /infantil/i.test(texto)) {
           categoria = "Infantil";
-        } else if (texto.includes("Cadete")) {
+        } else if (texto.toLowerCase().includes("cadet") || /cadete/i.test(texto)) {
           categoria = "Cadete";
-        } else if (texto.includes("Juvenil")) {
+        } else if (texto.toLowerCase().includes("juven") || /juvenil/i.test(texto)) {
           categoria = "Juvenil";
         }
         
         // Buscar grupo independientemente
-        if (texto.includes("Grupo") && !grupo.includes("Grupo")) {
+        if ((texto.includes("Grupo") || texto.includes("grupo")) && !grupo.includes("Grupo")) {
           const match = texto.match(/Grupo\s+(\w+)/i);
           if (match) {
             grupo = `Grupo ${match[1]}`;
@@ -76,7 +79,7 @@ const extraerCategoriaYGrupo = (contenido: any[][]): { categoria: string; grupo:
 };
 
 // Función para identificar columnas basadas en contenido de datos
-const identificarColumnasPorContenido = (contenido: any[][], startDataRow: number) => {
+const identificarColumnasPorContenido = (contenido: any[][], startDataRow: number, debug?: (msg: string) => void) => {
   const columnas = {
     jugador: -1,
     equipo: -1,
@@ -86,29 +89,37 @@ const identificarColumnasPorContenido = (contenido: any[][], startDataRow: numbe
     golesPartido: -1
   };
   
-  console.log("Analizando contenido de filas de datos para identificar columnas:");
+  const log = (msg: string) => {
+    console.log(msg);
+    if (debug) debug(msg);
+  };
   
-  // Analizar las primeras filas de datos
-  const analyzableRows = Math.min(startDataRow + 5, contenido.length);
+  log("Analizando contenido para identificar columnas:");
   
-  // Patrones para identificar columnas
+  // Usar más filas para el análisis
+  const analyzableRows = Math.min(startDataRow + 10, contenido.length);
+  
+  // Patrones mejorados para identificar columnas
   const nombresPatrones = [
-    /^[A-Za-záéíóúüñÁÉÍÓÚÜÑ\s]{4,}$/,               // Nombres con al menos 4 caracteres
-    /^[A-Za-záéíóúüñÁÉÍÓÚÜÑ]+\s+[A-Za-záéíóúüñÁÉÍÓÚÜÑ]+$/ // Nombre y apellido
+    /^[A-Za-záéíóúüñÁÉÍÓÚÜÑ\s]{3,}$/,               // Nombres con al menos 3 caracteres
+    /^[A-Za-záéíóúüñÁÉÍÓÚÜÑ]+\s+[A-Za-záéíóúüñÁÉÍÓÚÜÑ]+$/, // Nombre y apellido
+    /^[A-Z][a-z]+\s+[A-Z][a-z]+$/                    // Patrón de nombre propio
   ];
   
   const equiposPatrones = [
     /^[A-Za-záéíóúüñÁÉÍÓÚÜÑ\.][A-Za-záéíóúüñÁÉÍÓÚÜÑ\s\.\-]+$/,  // Nombres de equipos
-    /^C\.D\.|^C\.\s*F\.|^U\.D\.|^C\.P\./                       // Prefijos comunes de clubes
+    /^C\.D\.|^C\.\s*F\.|^U\.D\.|^C\.P\./,                       // Prefijos comunes de clubes
+    /salamanca|zamora|ávila|ciudad/i                            // Nombres de ciudades/equipos
   ];
   
   const golesPatrones = [
     /^\d+$/,                  // Solo números
-    /^[0-9]+\s*\(.*\)$/       // Números con texto adicional en paréntesis
+    /^[0-9]+\s*\(.*\)$/,      // Números con texto adicional en paréntesis
+    /^\d+\s*gol/i             // Número seguido de "gol/goles"
   ];
   
   // Contadores para cada columna potencial
-  const columnaCounts = Array(contenido[0]?.length || 0).fill(0).map(() => ({
+  const columnaCounts = Array(Math.max(...contenido.slice(0, analyzableRows).map(row => row?.length || 0))).fill(0).map(() => ({
     nombre: 0,
     equipo: 0,
     goles: 0
@@ -168,54 +179,184 @@ const identificarColumnasPorContenido = (contenido: any[][], startDataRow: numbe
   });
   
   // Asignar columnas solo si se han encontrado suficientes coincidencias
-  if (maxNombre.count >= 2) {
+  // Reducimos el umbral a 1 para ser más permisivos
+  if (maxNombre.count >= 1) {
     columnas.jugador = maxNombre.col;
-    console.log(`Columna de jugador identificada por contenido en posición ${maxNombre.col} con ${maxNombre.count} coincidencias`);
+    log(`Columna de jugador identificada por contenido en posición ${maxNombre.col} con ${maxNombre.count} coincidencias`);
   }
   
-  if (maxEquipo.count >= 2) {
+  if (maxEquipo.count >= 1) {
     // Evitar asignar la misma columna para jugador y equipo
     if (maxEquipo.col !== columnas.jugador) {
       columnas.equipo = maxEquipo.col;
-      console.log(`Columna de equipo identificada por contenido en posición ${maxEquipo.col} con ${maxEquipo.count} coincidencias`);
+      log(`Columna de equipo identificada por contenido en posición ${maxEquipo.col} con ${maxEquipo.count} coincidencias`);
     }
   }
   
-  if (maxGoles.count >= 2) {
+  if (maxGoles.count >= 1) {
     columnas.goles = maxGoles.col;
-    console.log(`Columna de goles identificada por contenido en posición ${maxGoles.col} con ${maxGoles.count} coincidencias`);
+    log(`Columna de goles identificada por contenido en posición ${maxGoles.col} con ${maxGoles.count} coincidencias`);
   }
   
+  // Añadimos método para buscar estructura de datos tabular
+  // Analizamos columnas por tipo de dato
+  if (columnas.jugador === -1 || columnas.equipo === -1 || columnas.goles === -1) {
+    log("Intentando detectar estructura tabular basada en tipos de datos...");
+    
+    // Primero detectar filas que parecen tener datos consistentes (al menos 3 columnas con datos)
+    let dataRowsCount = 0;
+    let columnsStructure = new Map<string, number>();
+    
+    for (let i = 0; i < Math.min(20, contenido.length); i++) {
+      if (contenido[i] && contenido[i].filter(cell => cell !== null && cell !== undefined && cell !== '').length >= 3) {
+        dataRowsCount++;
+        
+        // Analizar tipos por columna
+        contenido[i].forEach((cell, colIndex) => {
+          if (cell === null || cell === undefined || cell === '') return;
+          
+          let type = 'unknown';
+          const cellStr = String(cell).trim();
+          
+          if (/^\d+$/.test(cellStr)) {
+            type = 'number';
+          } else if (cellStr.length >= 3 && /^[A-Za-záéíóúüñÁÉÍÓÚÜÑ\s.,]+$/.test(cellStr)) {
+            if (cellStr.length >= 10) {
+              // Textos largos probablemente son equipos
+              type = 'long-text';
+            } else {
+              type = 'text';
+            }
+          }
+          
+          const key = `${colIndex}-${type}`;
+          columnsStructure.set(key, (columnsStructure.get(key) || 0) + 1);
+        });
+      }
+    }
+    
+    log(`Filas con estructura tabular detectadas: ${dataRowsCount}`);
+    
+    if (dataRowsCount >= 2) {
+      // Encontrar columnas que consistentemente tienen un tipo específico
+      let textColumns: number[] = [];
+      let longTextColumns: number[] = [];
+      let numberColumns: number[] = [];
+      
+      columnsStructure.forEach((count, key) => {
+        if (count >= 2) { // Al menos aparece en 2 filas
+          const [colIndex, type] = key.split('-');
+          const col = parseInt(colIndex);
+          
+          if (type === 'text') textColumns.push(col);
+          else if (type === 'long-text') longTextColumns.push(col);
+          else if (type === 'number') numberColumns.push(col);
+        }
+      });
+      
+      log(`Columnas con texto corto: ${textColumns.join(', ')}`);
+      log(`Columnas con texto largo: ${longTextColumns.join(', ')}`);
+      log(`Columnas con números: ${numberColumns.join(', ')}`);
+      
+      // Asignar columnas basadas en tipos
+      if (columnas.jugador === -1 && textColumns.length > 0) {
+        columnas.jugador = textColumns[0]; // Primera columna de texto corto = nombres
+        log(`Asignando columna de jugador a posición ${columnas.jugador} (por tipo texto corto)`);
+      }
+      
+      if (columnas.equipo === -1) {
+        if (longTextColumns.length > 0) {
+          columnas.equipo = longTextColumns[0]; // Primera columna de texto largo = equipos
+          log(`Asignando columna de equipo a posición ${columnas.equipo} (por tipo texto largo)`);
+        } else if (textColumns.length > 1) {
+          columnas.equipo = textColumns[1]; // Segunda columna de texto = equipos
+          log(`Asignando columna de equipo a posición ${columnas.equipo} (segunda columna de texto)`);
+        }
+      }
+      
+      if (columnas.goles === -1 && numberColumns.length > 0) {
+        columnas.goles = numberColumns[0]; // Primera columna numérica = goles
+        log(`Asignando columna de goles a posición ${columnas.goles} (por tipo numérico)`);
+      }
+    }
+  }
+  
+  // Si todavía no tenemos las columnas básicas, intentar con posiciones estándar
+  if (columnas.jugador === -1 || columnas.equipo === -1 || columnas.goles === -1) {
+    log("Usando asignación por posiciones estándar como último recurso");
+    
+    // Buscar primera fila que tenga al menos 3 columnas con datos
+    for (let i = 0; i < Math.min(20, contenido.length); i++) {
+      if (contenido[i] && contenido[i].filter(cell => cell !== null && cell !== undefined && cell !== '').length >= 3) {
+        if (columnas.jugador === -1) {
+          columnas.jugador = 0; // Primera columna
+          log("Asignando columna de jugador a posición 0 (primera columna)");
+        }
+        
+        if (columnas.equipo === -1) {
+          columnas.equipo = 1; // Segunda columna
+          log("Asignando columna de equipo a posición 1 (segunda columna)");
+        }
+        
+        if (columnas.goles === -1) {
+          columnas.goles = 2; // Tercera columna
+          log("Asignando columna de goles a posición 2 (tercera columna)");
+        }
+        
+        break;
+      }
+    }
+  }
+  
+  log("Mapeo final de columnas: " + JSON.stringify(columnas));
   return columnas;
 };
 
 // Función para procesar contenido de Excel
-const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
-  console.log("Procesando contenido del Excel...");
+const procesarContenidoExcel = (contenido: any[][], debug?: (msg: string) => void): Jugador[] => {
+  const log = (msg: string) => {
+    console.log(msg);
+    if (debug) debug(msg);
+  };
+  
+  log("Procesando contenido del Excel...");
   
   // Verificar si tenemos contenido válido
   if (!contenido || !Array.isArray(contenido) || contenido.length === 0) {
-    console.error("Contenido del Excel no válido o vacío");
+    log("Contenido del Excel no válido o vacío");
     return [];
   }
   
+  // Eliminar filas vacías
+  const contenidoFiltrado = contenido.filter(row => 
+    row && Array.isArray(row) && row.some(cell => cell !== null && cell !== undefined && cell !== '')
+  );
+  
+  if (contenidoFiltrado.length === 0) {
+    log("Después de filtrar filas vacías, no hay datos");
+    return [];
+  }
+  
+  log(`Contenido filtrado: ${contenidoFiltrado.length} filas`);
+  
   // Debug para ver las primeras filas
-  console.log("Primeras 5 filas del Excel:");
-  for (let i = 0; i < Math.min(5, contenido.length); i++) {
-    console.log(`Fila ${i+1}:`, contenido[i]);
+  log("Primeras 5 filas del Excel:");
+  for (let i = 0; i < Math.min(5, contenidoFiltrado.length); i++) {
+    log(`Fila ${i+1}: ${JSON.stringify(contenidoFiltrado[i])}`);
   }
   
   // Extraer categoría y grupo
-  const { categoria, grupo } = extraerCategoriaYGrupo(contenido);
+  const { categoria, grupo } = extraerCategoriaYGrupo(contenidoFiltrado);
   
   // Intentar encontrar una fila que parezca contener encabezados
   let headerRow = 0;
   let startDataRow = 1;
+  let foundHeader = false;
   
   // Buscar una fila que contenga textos de encabezados típicos
-  for (let i = 0; i < Math.min(10, contenido.length); i++) {
-    if (contenido[i] && Array.isArray(contenido[i])) {
-      const fila = contenido[i].map(cell => String(cell || '').toLowerCase());
+  for (let i = 0; i < Math.min(10, contenidoFiltrado.length); i++) {
+    if (contenidoFiltrado[i] && Array.isArray(contenidoFiltrado[i])) {
+      const fila = contenidoFiltrado[i].map(cell => String(cell || '').toLowerCase());
       // Buscar palabras clave típicas de encabezados
       if (fila.some(cell => 
           cell.includes('jugador') || 
@@ -226,21 +367,23 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
       )) {
         headerRow = i;
         startDataRow = i + 1;
-        console.log(`Fila de encabezado detectada en índice ${i} (fila ${i + 1}):`);
-        console.log(fila);
+        foundHeader = true;
+        log(`Fila de encabezado detectada en índice ${i} (fila ${i + 1}):`);
+        log(fila.join(', '));
         break;
       }
     }
   }
   
   // Si no encontramos una fila de encabezado, asumimos que está en la fila 0
-  if (headerRow === 0 && startDataRow === 1) {
-    console.log("No se encontró una fila clara de encabezados, usando primera fila con datos para iniciar");
+  if (!foundHeader) {
+    log("No se encontró una fila clara de encabezados, usando primera fila con datos para iniciar");
     // Buscar la primera fila con datos válidos
-    for (let i = 0; i < Math.min(10, contenido.length); i++) {
-      if (contenido[i] && Array.isArray(contenido[i]) && contenido[i].some(cell => cell !== null && cell !== undefined && cell !== '')) {
+    for (let i = 0; i < Math.min(10, contenidoFiltrado.length); i++) {
+      if (contenidoFiltrado[i] && Array.isArray(contenidoFiltrado[i]) && 
+          contenidoFiltrado[i].some(cell => cell !== null && cell !== undefined && cell !== '')) {
         startDataRow = i + 1;
-        console.log(`Primera fila con datos detectada en índice ${i} (fila ${i + 1})`);
+        log(`Primera fila con datos detectada en índice ${i} (fila ${i + 1})`);
         break;
       }
     }
@@ -257,45 +400,45 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
   };
   
   // Intentar detectar columnas por encabezados si existen
-  if (contenido[headerRow] && Array.isArray(contenido[headerRow])) {
-    const headers = contenido[headerRow].map(h => String(h || '').toLowerCase());
-    console.log("Encabezados detectados:", headers);
+  if (foundHeader && contenidoFiltrado[headerRow] && Array.isArray(contenidoFiltrado[headerRow])) {
+    const headers = contenidoFiltrado[headerRow].map(h => String(h || '').toLowerCase());
+    log("Encabezados detectados: " + JSON.stringify(headers));
     
     // Buscar índices para cada columna importante
     headers.forEach((header, index) => {
       if (!header) return;
       
-      if (header.includes("jugador") || header.includes("nombre")) {
+      if (header.includes("jugador") || header.includes("nombre") || header.includes("alumno")) {
         columnas.jugador = index;
-        console.log(`Columna 'jugador' detectada en posición ${index}`);
+        log(`Columna 'jugador' detectada en posición ${index}`);
       }
-      else if (header.includes("equipo") || header.includes("club")) {
+      else if (header.includes("equipo") || header.includes("club") || header.includes("colegio")) {
         columnas.equipo = index;
-        console.log(`Columna 'equipo' detectada en posición ${index}`);
+        log(`Columna 'equipo' detectada en posición ${index}`);
       }
-      else if (header.includes("partido") || header.includes("jugados")) {
+      else if (header.includes("partido") || header.includes("jugados") || header.includes("pj")) {
         columnas.partidosJugados = index;
-        console.log(`Columna 'partidosJugados' detectada en posición ${index}`);
+        log(`Columna 'partidosJugados' detectada en posición ${index}`);
       }
       else if (header.includes("goles") && !header.includes("partido")) {
         columnas.goles = index;
-        console.log(`Columna 'goles' detectada en posición ${index}`);
+        log(`Columna 'goles' detectada en posición ${index}`);
       }
       else if (header.includes("grupo")) {
         columnas.grupo = index;
-        console.log(`Columna 'grupo' detectada en posición ${index}`);
+        log(`Columna 'grupo' detectada en posición ${index}`);
       }
-      else if (header.includes("goles") && header.includes("partido")) {
+      else if ((header.includes("goles") && header.includes("partido")) || header.includes("promedio")) {
         columnas.golesPartido = index;
-        console.log(`Columna 'golesPartido' detectada en posición ${index}`);
+        log(`Columna 'golesPartido' detectada en posición ${index}`);
       }
     });
   }
   
   // Si no detectamos columnas por encabezados, intentamos por contenido
   if (columnas.jugador === -1 || columnas.equipo === -1 || columnas.goles === -1) {
-    console.log("Detectando columnas por contenido...");
-    const columnasPorContenido = identificarColumnasPorContenido(contenido, startDataRow);
+    log("Detectando columnas por contenido...");
+    const columnasPorContenido = identificarColumnasPorContenido(contenidoFiltrado, startDataRow, debug);
     
     // Fusionar resultados, priorizando los ya detectados
     Object.keys(columnasPorContenido).forEach(key => {
@@ -306,56 +449,23 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
     });
   }
   
-  // Si todavía no hemos encontrado columnas, intentamos asignarlas por posición estándar
-  if (columnas.jugador === -1 && contenido[0] && contenido[0].length >= 1) {
-    columnas.jugador = 0; // Primera columna
-    console.log("Asignando columna de jugador a posición 0 (primera columna)");
-  }
+  // Si todavía no hemos encontrado columnas, intentamos detectar la estructura tabular
+  // Este paso ya está incluido en identificarColumnasPorContenido
   
-  if (columnas.equipo === -1 && contenido[0] && contenido[0].length >= 2) {
-    columnas.equipo = 1; // Segunda columna
-    console.log("Asignando columna de equipo a posición 1 (segunda columna)");
-  }
-  
-  if (columnas.goles === -1 && contenido[0] && contenido[0].length >= 3) {
-    // Intentar encontrar la última columna con números
-    for (let j = contenido[0].length - 1; j >= 2; j--) {
-      let hasNumbers = false;
-      for (let i = startDataRow; i < Math.min(startDataRow + 5, contenido.length); i++) {
-        if (contenido[i] && contenido[i][j] !== undefined) {
-          const value = String(contenido[i][j]);
-          if (/\d+/.test(value)) {
-            hasNumbers = true;
-            columnas.goles = j;
-            console.log(`Asignando columna de goles a posición ${j} (encontrada columna con números)`);
-            break;
-          }
-        }
-      }
-      if (hasNumbers) break;
-    }
-    
-    // Si todavía no encontramos, usar tercera columna como último recurso
-    if (columnas.goles === -1) {
-      columnas.goles = 2; // Tercera columna
-      console.log("Asignando columna de goles a posición 2 (tercera columna) como último recurso");
-    }
-  }
-  
-  console.log("Mapeo final de columnas:", columnas);
+  log("Mapeo final de columnas: " + JSON.stringify(columnas));
   
   // Si no tenemos las columnas mínimas necesarias, retornar array vacío
   if (columnas.jugador === -1 || columnas.equipo === -1 || columnas.goles === -1) {
-    console.error("No se pudieron identificar las columnas esenciales. Jugador:", 
-                columnas.jugador, "Equipo:", columnas.equipo, "Goles:", columnas.goles);
+    log("No se pudieron identificar las columnas esenciales. Jugador:" + 
+                columnas.jugador + ", Equipo:" + columnas.equipo + ", Goles:" + columnas.goles);
     return [];
   }
   
   // Ahora podemos procesar los datos
   const jugadores: Jugador[] = [];
   
-  for (let i = startDataRow; i < contenido.length; i++) {
-    const fila = contenido[i];
+  for (let i = startDataRow; i < contenidoFiltrado.length; i++) {
+    const fila = contenidoFiltrado[i];
     if (!fila) continue;
     
     // Verificar si la fila tiene datos válidos
@@ -368,12 +478,18 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
     let nombre = nombreRaw ? String(nombreRaw).trim() : "";
     
     // Omitir filas con nombres vacíos o demasiado cortos
-    if (!nombre || nombre.length < 2 || /^\d+$/.test(nombre)) {
+    if (!nombre || nombre.length < 2 || /^\d+$/.test(nombre) || 
+        nombre.toLowerCase() === "nombre" || nombre.toLowerCase() === "jugador") {
       continue;
     }
     
     const equipoRaw = fila[columnas.equipo];
-    const equipo = equipoRaw ? String(equipoRaw).trim() : "Desconocido";
+    let equipo = equipoRaw ? String(equipoRaw).trim() : "Desconocido";
+    
+    // Si equipo contiene palabras reservadas, es probable que sea un encabezado
+    if (equipo.toLowerCase() === "equipo" || equipo.toLowerCase() === "club") {
+      continue;
+    }
     
     // Extraer goles
     let goles = 0;
@@ -383,6 +499,11 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
       if (golesMatch) {
         goles = parseInt(golesMatch[1], 10);
       }
+    }
+    
+    // Si no pudimos extraer goles válidos, esta fila probablemente no es un jugador
+    if (goles === 0 && String(fila[columnas.goles]).trim() !== "0") {
+      continue;
     }
     
     // Extraer partidos jugados si está disponible
@@ -417,23 +538,29 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
       golesPartido
     };
     
-    console.log(`Jugador procesado: ${nombre} (${equipo}) - Goles: ${goles}`);
+    log(`Jugador procesado: ${nombre} (${equipo}) - Goles: ${goles}`);
     jugadores.push(jugador);
   }
   
   // Ordenar por goles (mayor a menor)
   jugadores.sort((a, b) => b.goles - a.goles);
   
-  console.log(`Total de jugadores procesados: ${jugadores.length}`);
+  log(`Total de jugadores procesados: ${jugadores.length}`);
   return jugadores;
 };
 
 // Función mejorada para cargar archivo Excel
 export const cargarArchivoExcel = async (
   file: File, 
-  auth: { username: string; password: string }
+  auth: { username: string; password: string },
+  debug?: (msg: string) => void
 ): Promise<Jugador[]> => {
   return new Promise((resolve, reject) => {
+    const log = (msg: string) => {
+      console.log(msg);
+      if (debug) debug(msg);
+    };
+    
     // Validar credenciales básicas
     if (auth.username !== "CE4032" || auth.password !== "9525") {
       reject(new Error("Credenciales incorrectas"));
@@ -456,7 +583,7 @@ export const cargarArchivoExcel = async (
     }
     
     try {
-      console.log(`Procesando archivo Excel: ${file.name} (${file.size} bytes, tipo: ${file.type})`);
+      log(`Procesando archivo Excel: ${file.name} (${file.size} bytes, tipo: ${file.type})`);
       
       // Utilizamos XLSX.js para procesar el archivo
       import('xlsx').then(XLSX => {
@@ -469,6 +596,8 @@ export const cargarArchivoExcel = async (
               return;
             }
             
+            log("Archivo leído correctamente, comenzando procesamiento");
+            
             // Convertir ArrayBuffer a workbook
             const data = new Uint8Array(e.target.result as ArrayBuffer);
             
@@ -476,9 +605,14 @@ export const cargarArchivoExcel = async (
             let workbook;
             try {
               // Intentar leer con opciones estándar
-              workbook = XLSX.read(data, { type: 'array' });
+              workbook = XLSX.read(data, { 
+                type: 'array',
+                cellDates: true,
+                dateNF: 'dd/mm/yyyy'
+              });
+              log("Excel leído con opciones estándar");
             } catch (readError) {
-              console.error("Error al leer Excel con opciones estándar, intentando con opciones más permisivas:", readError);
+              log("Error al leer Excel con opciones estándar, intentando con opciones más permisivas");
               
               // Intentar con opciones más permisivas
               workbook = XLSX.read(data, { 
@@ -489,22 +623,31 @@ export const cargarArchivoExcel = async (
                 raw: true,
                 cellFormula: false
               });
+              log("Excel leído con opciones permisivas");
             }
+            
+            log(`Hojas en el libro: ${workbook.SheetNames.join(", ")}`);
             
             // Obtener la primera hoja de cálculo
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Información sobre el rango de la hoja
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+            log(`Rango de la hoja: ${worksheet['!ref']} (${range.e.r - range.s.r + 1} filas, ${range.e.c - range.s.c + 1} columnas)`);
             
             // Convertir a JSON con opciones más permisivas
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
               header: 1, 
               defval: null,
               blankrows: false,
-              rawNumbers: true // Para manejar números correctamente
+              rawNumbers: true
             }) as any[][];
             
+            log(`Datos JSON extraídos: ${jsonData.length} filas`);
+            
             // Procesar el contenido
-            const jugadores = procesarContenidoExcel(jsonData);
+            const jugadores = procesarContenidoExcel(jsonData, debug);
             
             if (jugadores.length === 0) {
               reject(new Error("No se pudieron extraer datos del archivo. Verifique que contenga columnas de jugador, equipo y goles."));
@@ -512,22 +655,23 @@ export const cargarArchivoExcel = async (
               resolve(jugadores);
             }
           } catch (error) {
-            console.error("Error al procesar el Excel:", error);
+            log(`Error al procesar el Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
             reject(new Error(`Error al procesar el Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`));
           }
         };
         
-        reader.onerror = () => {
+        reader.onerror = (error) => {
+          log(`Error al leer el archivo: ${error}`);
           reject(new Error("Error al leer el archivo"));
         };
         
         reader.readAsArrayBuffer(file);
       }).catch(err => {
-        console.error("Error al cargar la librería XLSX:", err);
+        log(`Error al cargar la librería XLSX: ${err instanceof Error ? err.message : 'Error desconocido'}`);
         reject(new Error("Error al procesar el archivo Excel: No se pudo cargar la librería de procesamiento"));
       });
     } catch (error) {
-      console.error("Error en el procesamiento del Excel:", error);
+      log(`Error en el procesamiento del Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       reject(new Error(`Error al procesar el Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`));
     }
   });
