@@ -10,6 +10,7 @@ interface UseFootballDataProps {
 
 export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const [showExcelUploader, setShowExcelUploader] = useState(true);
+  const [uploadedPlayerCount, setUploadedPlayerCount] = useState<number | undefined>(undefined);
   const { toast } = useToast();
   
   const { 
@@ -34,8 +35,9 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     }
     
     try {
-      await cargarDatosDesdeExcel(file, auth);
+      const result = await cargarDatosDesdeExcel(file, auth);
       setShowExcelUploader(false);
+      setUploadedPlayerCount(result.length);
       return true;
     } catch (error) {
       console.error("Error al cargar el Excel:", error);
@@ -58,7 +60,8 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     cargarDatosDesdeExcel: handleExcelUpload,
     dataSource,
     showExcelUploader,
-    setShowExcelUploader
+    setShowExcelUploader,
+    uploadedPlayerCount
   };
 };
 

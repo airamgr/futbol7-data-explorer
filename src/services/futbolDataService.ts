@@ -29,55 +29,71 @@ const extraerCategoriaYGrupo = (contenido: any[][]): { categoria: string; grupo:
   let categoria = "Desconocida";
   let grupo = "Desconocido";
   
-  // Buscamos en las primeras filas, especialmente en C1
-  for (let i = 0; i < Math.min(5, contenido.length); i++) {
-    if (contenido[i] && contenido[i][2]) { // Columna C (índice 2)
-      const texto = String(contenido[i][2]);
+  // Buscamos específicamente en la celda C1 como indicó el usuario
+  if (contenido.length > 0 && contenido[0] && contenido[0][2]) {
+    const textoC1 = String(contenido[0][2]).trim();
+    console.log("Contenido de celda C1:", textoC1);
+    
+    // Separar por coma para extraer categoría y grupo
+    if (textoC1.includes(",")) {
+      const partes = textoC1.split(",").map(p => p.trim());
       
-      // Comprobamos categoría
-      if (texto.includes("Benjamín") || texto.includes("Benjamine")) {
-        categoria = "Benjamín";
-      } else if (texto.includes("Prebenjamín") || texto.includes("Prebenjamine")) {
-        categoria = "Prebenjamín";
-      } else if (texto.includes("Alevín") || texto.includes("Alevine")) {
-        categoria = "Alevín";
-      } else if (texto.includes("Infantil")) {
-        categoria = "Infantil";
-      } else if (texto.includes("Cadete")) {
-        categoria = "Cadete";
-      } else if (texto.includes("Juvenil")) {
-        categoria = "Juvenil";
+      // La primera parte suele ser la categoría/competición
+      if (partes[0]) {
+        // Detectar categoría
+        if (partes[0].includes("Benjamín") || partes[0].includes("Benjamine")) {
+          categoria = "Benjamín";
+        } else if (partes[0].includes("Prebenjamín") || partes[0].includes("Prebenjamine")) {
+          categoria = "Prebenjamín";
+        } else if (partes[0].includes("Alevín") || partes[0].includes("Alevine")) {
+          categoria = "Alevín";
+        } else if (partes[0].includes("Infantil")) {
+          categoria = "Infantil";
+        } else if (partes[0].includes("Cadete")) {
+          categoria = "Cadete";
+        } else if (partes[0].includes("Juvenil")) {
+          categoria = "Juvenil";
+        } else {
+          categoria = partes[0]; // Usar el texto como está si no coincide con categorías conocidas
+        }
       }
       
-      // Extracción del grupo (asumiendo formato "... Grupo X")
-      const grupoMatch = texto.match(/Grupo\s+(\d+)/i);
-      if (grupoMatch) {
-        grupo = `Grupo ${grupoMatch[1]}`;
+      // La segunda parte suele ser el grupo
+      if (partes[1]) {
+        grupo = partes[1];
       }
+    } else {
+      // Si no hay coma, usar todo el texto como categoría
+      categoria = textoC1;
     }
   }
   
+  console.log(`Categoría extraída: ${categoria}, Grupo extraído: ${grupo}`);
   return { categoria, grupo };
 };
 
 // Función para encontrar las filas de encabezados y datos en el Excel
 const encontrarFilasImportantes = (contenido: any[][]): { headerRow: number; startDataRow: number } => {
-  let headerRow = -1;
+  // Como indicó el usuario, los datos empiezan en la fila 4 (índice 3 en JavaScript)
+  let headerRow = 3; // Fila 4 (índice 3)
   
-  // Buscar fila de encabezados (generalmente es la 3 o 4 en estos Excel)
-  for (let i = 0; i < Math.min(10, contenido.length); i++) {
-    if (
-      contenido[i] && 
-      contenido[i][0] && 
-      String(contenido[i][0]).toLowerCase().includes("jugador")
-    ) {
-      headerRow = i;
-      break;
+  // Si queremos verificar que realmente es la fila de encabezados, podemos buscar palabras clave
+  for (let i = 2; i < Math.min(6, contenido.length); i++) {
+    if (contenido[i] && Array.isArray(contenido[i])) {
+      const fila = contenido[i].map(cell => String(cell || '').toLowerCase());
+      // Buscar palabras clave típicas de encabezados de jugadores
+      if (fila.some(cell => 
+          cell.includes('jugador') || 
+          cell.includes('equipo') || 
+          cell.includes('goles') || 
+          cell.includes('club')
+      )) {
+        headerRow = i;
+        console.log(`Fila de encabezado detectada en índice ${i} (fila ${i + 1})`);
+        break;
+      }
     }
   }
-  
-  // Si no encontramos el encabezado, asumimos la fila 3
-  if (headerRow === -1) headerRow = 3;
   
   // Los datos empiezan en la siguiente fila después del encabezado
   const startDataRow = headerRow + 1;
@@ -89,7 +105,13 @@ const encontrarFilasImportantes = (contenido: any[][]): { headerRow: number; sta
 const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
   console.log("Procesando contenido del Excel...");
   
-  // Extraer categoría y grupo del título
+  // Debug para ver las primeras filas
+  console.log("Primeras 5 filas del Excel:");
+  for (let i = 0; i < Math.min(5, contenido.length); i++) {
+    console.log(`Fila ${i+1}:`, contenido[i]);
+  }
+  
+  // Extraer categoría y grupo de la celda C1
   const { categoria, grupo } = extraerCategoriaYGrupo(contenido);
   console.log(`Categoría detectada: ${categoria}, Grupo: ${grupo}`);
   
@@ -97,9 +119,7 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
   const { headerRow, startDataRow } = encontrarFilasImportantes(contenido);
   console.log(`Fila de encabezados: ${headerRow}, Comienzo de datos: ${startDataRow}`);
   
-  // Mapeo de columnas
-  const headers = contenido[headerRow] || [];
-  
+  // Mapeo de columnas - inicializamos con valores que intentaremos detectar
   let columnas = {
     jugador: -1,
     equipo: -1,
@@ -109,21 +129,59 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
     golesPartido: -1
   };
   
-  // Detectar las columnas por encabezados
+  // Verificar si tenemos la fila de encabezados
+  if (!contenido[headerRow] || !Array.isArray(contenido[headerRow])) {
+    console.error("Fila de encabezados no válida");
+    return [];
+  }
+  
+  // Detectar manualmente las columnas buscando palabras clave en los encabezados
+  const headers = contenido[headerRow].map(h => String(h || '').toLowerCase());
+  console.log("Encabezados detectados:", headers);
+  
+  // Buscar índices para cada columna importante
   headers.forEach((header, index) => {
-    const headerText = String(header).toLowerCase();
+    if (!header) return;
     
-    if (headerText.includes("jugador")) columnas.jugador = index;
-    else if (headerText.includes("equipo")) columnas.equipo = index;
-    else if (headerText.includes("partidos")) columnas.partidosJugados = index;
-    else if (headerText.includes("goles") && !headerText.includes("partido")) columnas.goles = index;
-    else if (headerText.includes("grupo")) columnas.grupo = index;
-    else if (headerText.includes("goles partido") || headerText.includes("goles/partido")) columnas.golesPartido = index;
+    if (header.includes("jugador") || header.includes("nombre")) {
+      columnas.jugador = index;
+    }
+    else if (header.includes("equipo") || header.includes("club")) {
+      columnas.equipo = index;
+    }
+    else if (header.includes("partido") || header.includes("jugados")) {
+      columnas.partidosJugados = index;
+    }
+    else if (header.includes("goles") && !header.includes("partido")) {
+      columnas.goles = index;
+    }
+    else if (header.includes("grupo")) {
+      columnas.grupo = index;
+    }
+    else if (header.includes("goles") && header.includes("partido")) {
+      columnas.golesPartido = index;
+    }
   });
   
   console.log("Mapeo de columnas:", columnas);
   
-  // Validar que tenemos las columnas esenciales
+  // Si no encontramos las columnas esenciales por los encabezados, intentamos asignarlas por posición
+  if (columnas.jugador === -1 && headers.length >= 1) {
+    columnas.jugador = 0; // Primera columna suele ser el jugador
+    console.log("Asignando columna de jugador por posición: 0");
+  }
+  
+  if (columnas.equipo === -1 && headers.length >= 2) {
+    columnas.equipo = 1; // Segunda columna suele ser el equipo
+    console.log("Asignando columna de equipo por posición: 1");
+  }
+  
+  if (columnas.goles === -1 && headers.length >= 3) {
+    columnas.goles = 2; // Tercera columna suele ser goles
+    console.log("Asignando columna de goles por posición: 2");
+  }
+  
+  // Validar que tenemos al menos las columnas de jugador y equipo
   if (columnas.jugador === -1 || columnas.equipo === -1) {
     console.error("No se pudieron identificar las columnas esenciales en el Excel");
     return [];
@@ -134,42 +192,50 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
   
   for (let i = startDataRow; i < contenido.length; i++) {
     const fila = contenido[i];
-    if (!fila || !fila[columnas.jugador]) continue; // Fila vacía o sin jugador
+    if (!fila || !fila[columnas.jugador]) {
+      continue; // Saltar filas vacías o sin jugador
+    }
     
-    const nombre = String(fila[columnas.jugador]).trim();
-    const equipo = fila[columnas.equipo] ? String(fila[columnas.equipo]).trim() : "Desconocido";
+    // Obtener y limpiar el nombre del jugador
+    const nombreRaw = fila[columnas.jugador];
+    if (!nombreRaw) continue;
     
-    // Extraer goles
+    const nombre = String(nombreRaw).trim();
+    if (nombre.length < 2) continue; // Evitar nombres muy cortos o vacíos
+    
+    // Obtener y limpiar el equipo
+    const equipoRaw = fila[columnas.equipo];
+    const equipo = equipoRaw ? String(equipoRaw).trim() : "Desconocido";
+    
+    // Extraer goles - tratamos de manejar textos como "25 (2 de penalti)"
     let goles = 0;
     if (columnas.goles !== -1 && fila[columnas.goles]) {
       const golesText = String(fila[columnas.goles]);
-      // Extraer número de goles, incluso si incluye texto como "25 (2 de penalti)"
-      const golesMatch = golesText.match(/^(\d+)/);
+      // Extraer el primer número que aparece
+      const golesMatch = golesText.match(/(\d+)/);
       if (golesMatch) {
         goles = parseInt(golesMatch[1], 10);
       }
     }
     
-    // Extraer partidos jugados
+    // Extraer partidos jugados si está disponible
     let partidosJugados = undefined;
     if (columnas.partidosJugados !== -1 && fila[columnas.partidosJugados]) {
       const partidosText = String(fila[columnas.partidosJugados]);
-      const partidosMatch = partidosText.match(/\d+/);
+      const partidosMatch = partidosText.match(/(\d+)/);
       if (partidosMatch) {
-        partidosJugados = parseInt(partidosMatch[0], 10);
+        partidosJugados = parseInt(partidosMatch[1], 10);
       }
     }
     
-    // Extraer goles por partido
+    // Extraer goles por partido si está disponible
     let golesPartido = undefined;
     if (columnas.golesPartido !== -1 && fila[columnas.golesPartido]) {
-      golesPartido = parseFloat(String(fila[columnas.golesPartido]).replace(',', '.'));
-    }
-    
-    // Extraer grupo específico de la fila si existe
-    let grupoJugador = grupo;
-    if (columnas.grupo !== -1 && fila[columnas.grupo]) {
-      grupoJugador = String(fila[columnas.grupo]).trim();
+      const gpText = String(fila[columnas.golesPartido]).replace(',', '.');
+      const gpMatch = gpText.match(/(\d+[.,]?\d*)/);
+      if (gpMatch) {
+        golesPartido = parseFloat(gpMatch[1]);
+      }
     }
     
     // Crear objeto jugador
@@ -179,11 +245,12 @@ const procesarContenidoExcel = (contenido: any[][]): Jugador[] => {
       equipo,
       categoria,
       goles,
+      grupo,
       partidosJugados,
-      grupo: grupoJugador,
       golesPartido
     };
     
+    console.log(`Jugador procesado: ${nombre} (${equipo}) - Goles: ${goles}`);
     jugadores.push(jugador);
   }
   
@@ -243,8 +310,13 @@ export const cargarArchivoExcel = async (
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
             
-            // Convertir a JSON
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null }) as any[][];
+            // Convertir a JSON con opciones más permisivas
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+              header: 1, 
+              defval: null,
+              blankrows: false,
+              rawNumbers: false // para evitar errores con formatos de celdas especiales
+            }) as any[][];
             
             // Procesar el contenido
             const jugadores = procesarContenidoExcel(jsonData);
@@ -267,50 +339,7 @@ export const cargarArchivoExcel = async (
         reader.readAsArrayBuffer(file);
       }).catch(err => {
         console.error("Error al cargar la librería XLSX:", err);
-        
-        // Si no podemos cargar XLSX.js, fallback a la simulación
-        console.log("Fallback: Simulando procesamiento de Excel");
-        
-        // Generar jugadores de ejemplo basados en nombre del archivo
-        const isPrebenjaMin = file.name.toLowerCase().includes('prebenjamin');
-        const isBenjamin = file.name.toLowerCase().includes('benjamin');
-        const isAlevin = file.name.toLowerCase().includes('alevin');
-        
-        let categoria = "Otra";
-        if (isPrebenjaMin) categoria = "Prebenjamín";
-        else if (isBenjamin) categoria = "Benjamín";
-        else if (isAlevin) categoria = "Alevín";
-        
-        // Generar jugadores de ejemplo
-        const equipos = ["CD Salamanca", "UD Alba", "Racing Béjar", "Atlético Ciudad Rodrigo", "CF Peñaranda"];
-        const jugadores: Jugador[] = [];
-        
-        const numeroJugadores = 20 + Math.floor(Math.random() * 30);
-        
-        for (let i = 0; i < numeroJugadores; i++) {
-          const id = `player-${Date.now()}-${i}`;
-          const equipo = equipos[Math.floor(Math.random() * equipos.length)];
-          const goles = Math.floor(Math.random() * 15);
-          const partidosJugados = 5 + Math.floor(Math.random() * 10);
-          
-          jugadores.push({
-            id,
-            nombre: `Jugador ${i + 1} ${file.name.split('.')[0]}`,
-            equipo,
-            categoria,
-            goles,
-            partidosJugados
-          });
-        }
-        
-        // Ordenar por goles de mayor a menor
-        jugadores.sort((a, b) => b.goles - a.goles);
-        
-        if (jugadores.length === 0) {
-          reject(new Error("No se pudieron extraer datos del archivo. Verifique el formato."));
-        } else {
-          resolve(jugadores);
-        }
+        reject(new Error("Error al procesar el archivo Excel: No se pudo cargar la librería de procesamiento"));
       });
     } catch (error) {
       console.error("Error en el procesamiento del Excel:", error);

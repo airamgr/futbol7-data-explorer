@@ -13,9 +13,10 @@ interface FileUploaderProps {
   isLoading: boolean;
   accept: string;
   maxSize?: number; // tamaño máximo en MB
+  successCount?: number; // número de registros procesados con éxito
 }
 
-const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUploaderProps) => {
+const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10, successCount }: FileUploaderProps) => {
   const {
     dragActive,
     file,
@@ -67,7 +68,7 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
           />
         )}
         
-        {uploadStatus === 'success' && <UploadSuccess />}
+        {uploadStatus === 'success' && <UploadSuccess count={successCount} />}
         
         {uploadStatus === 'error' && (
           <UploadError
