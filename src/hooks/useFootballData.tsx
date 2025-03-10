@@ -1,17 +1,14 @@
 
-import { useEffect, useState } from 'react';
-import { Jugador, FiltroJugadores } from '@/services/futbolDataService';
-import useBackendAvailability from './useBackendAvailability';
+import { useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
 import useFilteredPlayers from './useFilteredPlayers';
 import usePlayerData from './usePlayerData';
-import { useToast } from '@/components/ui/use-toast';
 
 interface UseFootballDataProps {
   auth: { username: string; password: string } | null;
 }
 
 export const useFootballData = ({ auth }: UseFootballDataProps) => {
-  const { backendDisponible } = useBackendAvailability();
   const [showExcelUploader, setShowExcelUploader] = useState(true);
   const { toast } = useToast();
   
@@ -19,20 +16,11 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     jugadores, 
     isLoading, 
     error, 
-    cargarDatos, 
     cargarDatosDesdeExcel, 
     dataSource 
   } = usePlayerData(auth);
   
   const { filteredJugadores, filtros, actualizarFiltros, resetearFiltros } = useFilteredPlayers(jugadores);
-
-  useEffect(() => {
-    if (auth && !showExcelUploader) {
-      // Cargamos datos automáticamente solo si no estamos mostrando el uploader
-      // para priorizar la carga desde Excel
-      cargarDatos();
-    }
-  }, [auth, showExcelUploader]);
 
   // Función para cargar datos desde un archivo Excel
   const handleExcelUpload = async (file: File) => {
@@ -42,7 +30,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
         description: "Debes iniciar sesión para cargar datos",
         variant: "destructive"
       });
-      return;
+      return false;
     }
     
     try {
@@ -67,10 +55,8 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     filtros,
     actualizarFiltros,
     resetearFiltros,
-    cargarDatos,
     cargarDatosDesdeExcel: handleExcelUpload,
     dataSource,
-    backendDisponible,
     showExcelUploader,
     setShowExcelUploader
   };

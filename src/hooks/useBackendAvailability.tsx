@@ -1,29 +1,10 @@
 
-import { useState, useEffect } from 'react';
-import { verificarBackendDisponible } from '@/services/futbolDataService';
-import { useToast } from '@/components/ui/use-toast';
+import { useState } from 'react';
 
 export const useBackendAvailability = () => {
-  const [backendDisponible, setBackendDisponible] = useState<boolean | null>(null);
-  const { toast } = useToast();
-
-  // Verificar disponibilidad del backend al inicio
-  useEffect(() => {
-    const verificarBackend = async () => {
-      const disponible = await verificarBackendDisponible();
-      setBackendDisponible(disponible);
-      
-      if (!disponible) {
-        toast({
-          title: "Backend no disponible",
-          description: "El servidor Python no está disponible. Asegúrate de iniciarlo con 'uvicorn main:app --reload'",
-          variant: "destructive",
-        });
-      }
-    };
-    
-    verificarBackend();
-  }, [toast]);
+  // Ya no verificamos la disponibilidad del backend
+  // Solo informamos que no es necesario
+  const [backendDisponible] = useState<boolean>(false);
 
   return { backendDisponible };
 };

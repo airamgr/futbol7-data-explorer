@@ -47,9 +47,7 @@ const Index = () => {
     filtros,
     actualizarFiltros,
     resetearFiltros,
-    cargarDatos,
     dataSource,
-    backendDisponible,
     cargarDatosDesdeExcel
   } = useFootballData({ auth: authCredentials });
   
@@ -101,7 +99,7 @@ const Index = () => {
         </AnimatePresence>
         
         {/* Estado de conexión */}
-        <ConnectionStatus error={dataError} backendDisponible={backendDisponible} />
+        <ConnectionStatus error={dataError} />
         
         {/* Cabecera y controles principales */}
         <PageHeader 
@@ -112,7 +110,7 @@ const Index = () => {
         />
         
         {/* Status del origen de datos */}
-        <DataSourceBadges dataSource={dataSource} backendDisponible={backendDisponible} />
+        <DataSourceBadges dataSource={dataSource} />
         
         {/* Uploader Modal - siempre visible por defecto */}
         <AnimatePresence>
