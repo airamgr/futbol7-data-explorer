@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { 
   extraerTodosLosDatos, 
   Jugador, 
-  verificarBackendDisponible
+  verificarBackendDisponible,
+  cargarArchivoExcel
 } from '@/services/futbolDataService';
 import { 
   storeJugadoresInSupabase, 
@@ -16,7 +17,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intentos, setIntentos] = useState(0);
-  const [dataSource, setDataSource] = useState<'supabase' | 'backend' | null>(null);
+  const [dataSource, setDataSource] = useState<'supabase' | 'backend' | 'excel' | null>(null);
   const { toast } = useToast();
 
   const obtenerDatosDesdeBackend = async (credentials: { username: string; password: string }) => {
@@ -62,6 +63,61 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
       if (error instanceof Error && error.message.includes('500')) {
         throw new Error('Error en el servidor Python (500): Hay un problema al extraer los datos. Verifica los logs del servidor Python para más detalles.');
       }
+      
+      throw error;
+    }
+  };
+
+  // Nueva función para cargar datos desde un archivo Excel
+  const cargarDatosDesdeExcel = async (file: File, credentials: { username: string; password: string }) => {
+    try {
+      // Procesamos el archivo Excel
+      const result = await cargarArchivoExcel(file, credentials);
+      
+      if (result.length === 0) {
+        throw new Error('No se pudieron extraer datos del Excel. El archivo no contiene jugadores.');
+      }
+      
+      // Guardamos los datos en Supabase
+      const storeResult = await storeJugadoresInSupabase(result);
+      
+      if (storeResult.success) {
+        toast({
+          title: 'Datos guardados en Supabase',
+          description: `Se han guardado ${result.length} jugadores en la base de datos`,
+        });
+      } else {
+        toast({
+          title: 'Error al guardar en Supabase',
+          description: storeResult.error || 'No se pudieron guardar los datos en Supabase',
+          variant: 'destructive',
+        });
+      }
+      
+      setJugadores(result);
+      setDataSource('excel');
+      
+      toast({
+        title: 'Excel procesado correctamente',
+        description: `Se han encontrado ${result.length} jugadores en el archivo`,
+      });
+      
+      console.log(`Datos cargados correctamente desde Excel: ${result.length} jugadores`);
+      
+      return result;
+    } catch (error) {
+      console.error('Error al procesar archivo Excel:', error);
+      
+      let message = 'Error al procesar el archivo Excel';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      
+      toast({
+        title: 'Error al procesar Excel',
+        description: message,
+        variant: 'destructive',
+      });
       
       throw error;
     }
@@ -192,6 +248,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
     isLoading,
     error,
     cargarDatos,
+    cargarDatosDesdeExcel,
     dataSource
   };
 };

@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import NavBar from '@/components/NavBar';
 import { useAuth } from '@/hooks/useAuth';
 import { useFootballData } from '@/hooks/useFootballData';
+import FileUploader from '@/components/FileUploader';
 
 // Componentes refactorizados
 import AuthScreen from '@/components/AuthScreen';
@@ -19,6 +20,7 @@ const Index = () => {
   const { isAuthenticated, username, login, logout, isLoading: authLoading } = useAuth();
   const [showWelcome, setShowWelcome] = useState(true);
   const [authCredentials, setAuthCredentials] = useState<{ username: string; password: string } | null>(null);
+  const [showUploader, setShowUploader] = useState(false);
   
   // Extraer credenciales cuando el usuario está autenticado
   useEffect(() => {
@@ -47,7 +49,8 @@ const Index = () => {
     resetearFiltros,
     cargarDatos,
     dataSource,
-    backendDisponible
+    backendDisponible,
+    cargarDatosDesdeExcel
   } = useFootballData({ auth: authCredentials });
   
   // Manejar login
@@ -57,6 +60,20 @@ const Index = () => {
       setShowWelcome(false);
     }
     return success;
+  };
+
+  // Manejador para la carga de archivos Excel
+  const handleFileUpload = async (file: File) => {
+    if (!authCredentials) {
+      return;
+    }
+    
+    try {
+      await cargarDatosDesdeExcel(file);
+      setShowUploader(false);
+    } catch (error) {
+      console.error('Error al cargar el archivo:', error);
+    }
   };
   
   // Si el usuario no está autenticado, mostrar el formulario de inicio de sesión
@@ -90,10 +107,40 @@ const Index = () => {
           onRefreshData={cargarDatos} 
           onLogout={logout}
           isLoading={dataLoading}
+          onUploadClick={() => setShowUploader(true)}
         />
         
         {/* Status del origen de datos */}
         <DataSourceBadges dataSource={dataSource} backendDisponible={backendDisponible} />
+        
+        {/* Uploader Modal */}
+        <AnimatePresence>
+          {showUploader && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-background rounded-lg shadow-lg w-full max-w-md">
+                <div className="p-4 border-b">
+                  <h2 className="text-xl font-semibold">Cargar archivo Excel</h2>
+                </div>
+                <div className="p-4">
+                  <FileUploader 
+                    onFileUpload={handleFileUpload}
+                    isLoading={dataLoading}
+                    accept=".xlsx,.xls"
+                    maxSize={5}
+                  />
+                </div>
+                <div className="p-4 border-t flex justify-end">
+                  <button 
+                    className="px-4 py-2 rounded-md bg-muted hover:bg-muted/80"
+                    onClick={() => setShowUploader(false)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
         
         {/* Panel de resumen */}
         <StatsSummary jugadores={jugadores} />

@@ -1,77 +1,61 @@
 
-import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { DownloadCloud, LogOut } from 'lucide-react';
+import { RefreshCw, LogOut, FileUp } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface PageHeaderProps {
   onRefreshData: () => void;
   onLogout: () => void;
   isLoading: boolean;
+  onUploadClick?: () => void;
 }
 
-const PageHeader = ({ onRefreshData, onLogout, isLoading }: PageHeaderProps) => {
+const PageHeader = ({ onRefreshData, onLogout, isLoading, onUploadClick }: PageHeaderProps) => {
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 mb-8">
+    <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
       <div>
-        <motion.h1 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="text-3xl font-bold text-slate-800"
-        >
-          Explorador de Datos
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="text-slate-500"
-        >
-          Analiza el rendimiento de los jugadores de fútbol base
-        </motion.p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Explorador de Datos - Fútbol 7
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Estadísticas de goleadores de la temporada actual
+        </p>
       </div>
       
-      <div className="flex space-x-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                onClick={onRefreshData} 
-                disabled={isLoading}
-                className="hover:bg-primary/5"
-              >
-                {isLoading ? (
-                  <>
-                    <motion.div
-                      className="h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    />
-                    Cargando...
-                  </>
-                ) : (
-                  <>
-                    <DownloadCloud className="h-4 w-4 mr-2" />
-                    Actualizar datos
-                  </>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Intenta cargar datos actualizados del servidor</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <div className="flex items-center gap-2">
+        {onUploadClick && (
+          <Button 
+            variant="outline" 
+            onClick={onUploadClick}
+            className="flex items-center gap-2"
+          >
+            <FileUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Cargar Excel</span>
+          </Button>
+        )}
+        
+        <Button 
+          variant="outline" 
+          onClick={onRefreshData}
+          disabled={isLoading}
+          className="flex items-center gap-2"
+        >
+          <motion.div
+            animate={isLoading ? { rotate: 360 } : { rotate: 0 }}
+            transition={{ repeat: isLoading ? Infinity : 0, duration: 1, ease: "linear" }}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </motion.div>
+          <span className="hidden sm:inline">Actualizar datos</span>
+        </Button>
         
         <Button 
           variant="ghost" 
           onClick={onLogout}
-          className="hover:bg-destructive/10"
+          className="flex items-center gap-2"
         >
-          <LogOut className="h-4 w-4 mr-2" />
-          Cerrar sesión
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">Cerrar sesión</span>
         </Button>
       </div>
     </div>

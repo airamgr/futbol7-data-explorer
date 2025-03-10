@@ -11,7 +11,14 @@ interface UseFootballDataProps {
 
 export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const { backendDisponible } = useBackendAvailability();
-  const { jugadores, isLoading, error, cargarDatos, dataSource } = usePlayerData(auth);
+  const { 
+    jugadores, 
+    isLoading, 
+    error, 
+    cargarDatos, 
+    cargarDatosDesdeExcel, 
+    dataSource 
+  } = usePlayerData(auth);
   const { filteredJugadores, filtros, actualizarFiltros, resetearFiltros } = useFilteredPlayers(jugadores);
 
   // Carga inicial de datos
@@ -21,6 +28,12 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     }
   }, [auth]);
 
+  // Función para cargar datos desde un archivo Excel
+  const handleExcelUpload = async (file: File) => {
+    if (!auth) return;
+    return await cargarDatosDesdeExcel(file, auth);
+  };
+
   return {
     jugadores: filteredJugadores,
     isLoading,
@@ -29,6 +42,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     actualizarFiltros,
     resetearFiltros,
     cargarDatos,
+    cargarDatosDesdeExcel: handleExcelUpload,
     dataSource,
     backendDisponible
   };

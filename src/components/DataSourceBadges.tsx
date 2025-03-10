@@ -1,9 +1,9 @@
 
 import { Badge } from '@/components/ui/badge';
-import { Database, ServerCrash, WifiOff } from 'lucide-react';
+import { Database, ServerCrash, WifiOff, FileSpreadsheet } from 'lucide-react';
 
 interface DataSourceBadgesProps {
-  dataSource: 'supabase' | 'backend' | null;
+  dataSource: 'supabase' | 'backend' | 'excel' | null;
   backendDisponible: boolean | null;
 }
 
@@ -21,6 +21,13 @@ const DataSourceBadges = ({ dataSource, backendDisponible }: DataSourceBadgesPro
         <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 ml-2">
           <ServerCrash className="h-3 w-3 mr-1" />
           Datos actualizados desde backend
+        </Badge>
+      )}
+      
+      {dataSource === 'excel' && (
+        <Badge variant="outline" className="bg-purple-50 text-purple-800 border-purple-200 ml-2">
+          <FileSpreadsheet className="h-3 w-3 mr-1" />
+          Datos cargados desde Excel
         </Badge>
       )}
       

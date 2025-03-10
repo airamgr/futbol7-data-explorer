@@ -1,4 +1,3 @@
-
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -160,6 +159,94 @@ export const verificarCredenciales = async (auth: { username: string; password: 
     console.error('Error al verificar credenciales:', error);
     return false;
   }
+};
+
+// Nueva función para cargar archivo Excel
+export const cargarArchivoExcel = async (
+  file: File, 
+  auth: { username: string; password: string }
+): Promise<Jugador[]> => {
+  let retries = 0;
+  
+  while (retries < MAX_RETRIES) {
+    try {
+      console.log(`Iniciando carga de Excel (intento ${retries + 1}/${MAX_RETRIES})`);
+      
+      // Verificamos la disponibilidad del backend
+      const backendDisponible = await verificarBackendDisponible();
+      
+      if (!backendDisponible) {
+        console.error("El backend de Python no está disponible");
+        throw new Error("El servidor backend no está disponible. Asegúrate de que está en ejecución en http://localhost:8000");
+      }
+      
+      // Crear FormData para enviar el archivo
+      const formData = new FormData();
+      formData.append('archivo', file);
+      formData.append('username', auth.username);
+      formData.append('password', auth.password);
+      
+      // Hacemos la solicitud al endpoint de carga de Excel
+      console.log("Enviando solicitud a /cargar-excel");
+      const response = await fetch(`${API_BASE_URL}/cargar-excel`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error del servidor (${response.status}): ${errorText}`);
+        
+        try {
+          // Intentamos parsear el error como JSON
+          const errorData = JSON.parse(errorText);
+          const errorMessage = errorData.detail || `Error ${response.status}: ${response.statusText}`;
+          throw new Error(errorMessage);
+        } catch (parseError) {
+          // Si no podemos parsear como JSON, usamos el texto tal cual
+          if (response.status === 500) {
+            throw new Error(`Error 500: Error interno del servidor Python. Revisa los logs para más detalles.`);
+          } else {
+            throw new Error(`Error ${response.status}: ${errorText || response.statusText}`);
+          }
+        }
+      }
+      
+      const data = await response.json();
+      console.log("Datos cargados correctamente:", data);
+      
+      if (!data.jugadores || data.jugadores.length === 0) {
+        console.warn("La respuesta del servidor no contiene jugadores o está vacía");
+        throw new Error("No se encontraron jugadores en el archivo Excel. Verifica el formato del archivo.");
+      }
+      
+      // Añadimos un timestamp de última actualización
+      const jugadoresConTimestamp = data.jugadores.map((j: Jugador) => ({
+        ...j,
+        lastUpdated: new Date().toISOString()
+      }));
+      
+      // Devolvemos los datos extraídos
+      return jugadoresConTimestamp as Jugador[];
+    } catch (error) {
+      console.error(`Error cargando Excel (intento ${retries + 1}):`, error);
+      
+      retries++;
+      
+      if (retries < MAX_RETRIES) {
+        console.log(`Esperando ${RETRY_DELAY/1000} segundos antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      } else {
+        console.error(`Agotados ${MAX_RETRIES} intentos. Error crítico:`, error);
+        throw error; // Propagamos el error después de agotar reintentos
+      }
+    }
+  }
+  
+  throw new Error(`No se pudo cargar el archivo Excel después de ${MAX_RETRIES} intentos`);
 };
 
 // Nueva función para extraer todos los datos usando el backend de Python
