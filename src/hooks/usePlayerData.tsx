@@ -71,7 +71,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
       
       if (result.length === 0) {
         handleDebugInfo("No se encontraron jugadores en el archivo");
-        throw new Error('No se pudieron extraer datos del Excel. El archivo no contiene jugadores.');
+        throw new Error('No se pudieron extraer datos del Excel. El archivo no contiene jugadores o no tiene el formato esperado.');
       }
       
       setJugadores(result);

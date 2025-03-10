@@ -46,7 +46,7 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
       if (result.length === 0) {
         toast({
           title: "Advertencia",
-          description: "No se encontraron jugadores en el archivo. Intenta abrir el archivo y guardarlo como .xlsx o verifica que tenga datos de jugadores, equipos y goles.",
+          description: "No se encontraron jugadores en el archivo. Verifica que tenga el formato correcto con columnas para Jugador, Equipo, Grupo, Partidos Jugados, Goles y Goles por partido.",
           variant: "destructive"
         });
         setUploadedPlayerCount(0);

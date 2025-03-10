@@ -33,16 +33,15 @@ const UploadSuccess = ({ count, fileType }: UploadSuccessProps) => {
           <div className="mt-2 p-3 bg-amber-50 rounded-md text-sm">
             <p className="font-semibold flex items-center">
               <FileSpreadsheet className="h-4 w-4 mr-1" />
-              Consejos para Excel:
+              Formato esperado:
             </p>
             <div className="text-xs mt-1 text-left">
-              <p className="mb-1">Asegúrate que:</p>
+              <p className="mb-1">El archivo Excel debe tener:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>El Excel contenga columnas para Jugador, Equipo y Goles</li>
-                <li>Las columnas tengan datos en al menos 2-3 filas</li>
-                <li>Intenta guardar como .xlsx desde Excel (Archivo → Guardar como)</li>
-                <li>Verifica que los datos estén en alguna de las hojas del archivo</li>
-                <li>Si el archivo es antiguo, intenta abrirlo en Excel y guardarlo nuevamente</li>
+                <li>Columnas: Jugador, Equipo, Grupo, Partidos Jugados, Goles, Goles partido</li>
+                <li>Datos de jugadores a partir de la fila 4</li>
+                <li>Título y temporada en las primeras filas</li>
+                <li>Si el archivo es antiguo, intenta abrirlo en Excel y guardarlo como .xlsx</li>
               </ul>
             </div>
           </div>
