@@ -35,15 +35,39 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     }
     
     try {
+      console.log(`Iniciando carga del archivo: ${file.name}`);
       const result = await cargarDatosDesdeExcel(file, auth);
+      
+      if (result.length === 0) {
+        toast({
+          title: "Advertencia",
+          description: "No se encontraron jugadores en el archivo. Verifica que el formato sea correcto y que contenga datos de jugadores.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
       setShowExcelUploader(false);
       setUploadedPlayerCount(result.length);
+      
+      toast({
+        title: "Excel procesado correctamente",
+        description: `Se han encontrado ${result.length} jugadores en el archivo`,
+      });
+      
       return true;
     } catch (error) {
       console.error("Error al cargar el Excel:", error);
+      
+      // Obtener mensaje de error más detallado
+      let errorMessage = "Error desconocido al procesar el archivo";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error al cargar Excel",
-        description: error instanceof Error ? error.message : "Error desconocido al procesar el archivo",
+        description: errorMessage,
         variant: "destructive"
       });
       return false;

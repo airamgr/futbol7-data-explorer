@@ -1,5 +1,5 @@
 
-import { AlertTriangle, Database } from 'lucide-react';
+import { AlertTriangle, Database, FileSpreadsheet } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface ConnectionStatusProps {
@@ -35,17 +35,22 @@ const ConnectionStatus = ({ error }: ConnectionStatusProps) => {
         
         {isExcelError && (
           <div className="mt-2 p-2 bg-orange-50 rounded-md text-sm">
-            <p className="font-semibold">
+            <p className="font-semibold flex items-center">
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
               Error al procesar el archivo Excel
             </p>
             <p className="text-xs mt-1">
               Posibles causas:
-              - Formato incorrecto del archivo
-              - Estructura de datos no reconocida
-              - Archivo dañado o corrupto
+              <ul className="list-disc pl-5 mt-1">
+                <li>Formato incorrecto del archivo</li>
+                <li>Estructura de datos no reconocida</li>
+                <li>Las columnas de jugador, equipo o goles no fueron detectadas</li>
+                <li>Archivo dañado o corrupto</li>
+              </ul>
             </p>
             <p className="text-xs mt-2">
-              Intenta con otro archivo Excel que contenga los datos en un formato adecuado.
+              Intenta con otro archivo Excel que contenga columnas con nombres "Jugador", "Equipo" y "Goles". 
+              O prueba volver a guardarlo con formato .xlsx.
             </p>
           </div>
         )}

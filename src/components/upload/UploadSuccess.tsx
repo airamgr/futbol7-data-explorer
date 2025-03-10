@@ -22,6 +22,11 @@ const UploadSuccess = ({ count }: UploadSuccessProps) => {
           Se han encontrado {count} jugadores en el archivo
         </p>
       )}
+      {count === 0 && (
+        <p className="text-sm text-amber-600 mt-1">
+          No se encontraron jugadores en el archivo. Verifica el formato.
+        </p>
+      )}
     </motion.div>
   );
 };
