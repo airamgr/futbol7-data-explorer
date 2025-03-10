@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Jugador, FiltroJugadores } from '@/services/futbolDataService';
 import useBackendAvailability from './useBackendAvailability';
 import useFilteredPlayers from './useFilteredPlayers';
@@ -11,6 +11,8 @@ interface UseFootballDataProps {
 
 export const useFootballData = ({ auth }: UseFootballDataProps) => {
   const { backendDisponible } = useBackendAvailability();
+  const [showExcelUploader, setShowExcelUploader] = useState(false);
+  
   const { 
     jugadores, 
     isLoading, 
@@ -19,9 +21,10 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     cargarDatosDesdeExcel, 
     dataSource 
   } = usePlayerData(auth);
+  
   const { filteredJugadores, filtros, actualizarFiltros, resetearFiltros } = useFilteredPlayers(jugadores);
 
-  // Carga inicial de datos
+  // Priorizamos la carga de datos desde Excel al inicio
   useEffect(() => {
     if (auth) {
       cargarDatos();
@@ -44,7 +47,9 @@ export const useFootballData = ({ auth }: UseFootballDataProps) => {
     cargarDatos,
     cargarDatosDesdeExcel: handleExcelUpload,
     dataSource,
-    backendDisponible
+    backendDisponible,
+    showExcelUploader,
+    setShowExcelUploader
   };
 };
 

@@ -20,7 +20,7 @@ const Index = () => {
   const { isAuthenticated, username, login, logout, isLoading: authLoading } = useAuth();
   const [showWelcome, setShowWelcome] = useState(true);
   const [authCredentials, setAuthCredentials] = useState<{ username: string; password: string } | null>(null);
-  const [showUploader, setShowUploader] = useState(false);
+  const [showUploader, setShowUploader] = useState(true); // Mostrar el uploader por defecto
   
   // Extraer credenciales cuando el usuario está autenticado
   useEffect(() => {
@@ -93,7 +93,8 @@ const Index = () => {
               username={username} 
               onClose={() => {
                 setShowWelcome(false);
-                cargarDatos();
+                // No cargar datos automáticamente, esperar a que suban archivos
+                setShowUploader(true);
               }} 
             />
           )}
@@ -104,7 +105,7 @@ const Index = () => {
         
         {/* Cabecera y controles principales */}
         <PageHeader 
-          onRefreshData={cargarDatos} 
+          onRefreshData={() => setShowUploader(true)} 
           onLogout={logout}
           isLoading={dataLoading}
           onUploadClick={() => setShowUploader(true)}
@@ -113,15 +114,27 @@ const Index = () => {
         {/* Status del origen de datos */}
         <DataSourceBadges dataSource={dataSource} backendDisponible={backendDisponible} />
         
-        {/* Uploader Modal */}
+        {/* Uploader Modal - siempre visible por defecto */}
         <AnimatePresence>
           {showUploader && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div className="bg-background rounded-lg shadow-lg w-full max-w-md">
-                <div className="p-4 border-b">
+                <div className="p-4 border-b flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Cargar archivo Excel</h2>
+                  {jugadores.length > 0 && (
+                    <button 
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowUploader(false)}
+                      aria-label="Cerrar"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
                 <div className="p-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Carga los archivos Excel con los datos de los jugadores para visualizarlos
+                  </p>
                   <FileUploader 
                     onFileUpload={handleFileUpload}
                     isLoading={dataLoading}
@@ -129,30 +142,52 @@ const Index = () => {
                     maxSize={5}
                   />
                 </div>
-                <div className="p-4 border-t flex justify-end">
-                  <button 
-                    className="px-4 py-2 rounded-md bg-muted hover:bg-muted/80"
-                    onClick={() => setShowUploader(false)}
-                  >
-                    Cerrar
-                  </button>
-                </div>
+                {jugadores.length > 0 && (
+                  <div className="p-4 border-t flex justify-end">
+                    <button 
+                      className="px-4 py-2 rounded-md bg-muted hover:bg-muted/80"
+                      onClick={() => setShowUploader(false)}
+                    >
+                      Ver datos cargados
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </AnimatePresence>
         
-        {/* Panel de resumen */}
-        <StatsSummary jugadores={jugadores} />
-        
-        {/* Tabs de datos y filtros */}
-        <DataTabs 
-          jugadores={jugadores}
-          isLoading={dataLoading}
-          filtros={filtros}
-          onFiltrosChange={actualizarFiltros}
-          onResetFiltros={resetearFiltros}
-        />
+        {/* Panel de resumen - Solo se muestra si hay datos */}
+        {jugadores.length > 0 && !showUploader && (
+          <>
+            <StatsSummary jugadores={jugadores} />
+            
+            {/* Tabs de datos y filtros */}
+            <DataTabs 
+              jugadores={jugadores}
+              isLoading={dataLoading}
+              filtros={filtros}
+              onFiltrosChange={actualizarFiltros}
+              onResetFiltros={resetearFiltros}
+            />
+          </>
+        )}
+
+        {/* Mensaje si no hay datos y el uploader está cerrado */}
+        {jugadores.length === 0 && !showUploader && (
+          <div className="text-center p-12 bg-background rounded-lg shadow-sm mt-8">
+            <h3 className="text-xl font-semibold mb-2">No hay datos disponibles</h3>
+            <p className="text-muted-foreground mb-4">
+              Carga un archivo Excel para visualizar los datos
+            </p>
+            <button
+              onClick={() => setShowUploader(true)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Cargar archivo Excel
+            </button>
+          </div>
+        )}
       </main>
       
       <Footer />
