@@ -1,9 +1,9 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileType, FileUp, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, FileType, FileUp, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,9 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -34,14 +36,20 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
   };
   
   const validateFile = (file: File): boolean => {
-    // Validar tipo de archivo
-    const fileType = file.type;
-    const validTypes = accept.split(',').map(type => type.trim());
+    // Limpiar errores previos
+    setErrorMessage(null);
     
-    if (!validTypes.some(type => fileType.includes(type.replace('*', '')))) {
+    // Verificamos la extensión del archivo
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const validExtensions = accept.split(',')
+      .map(ext => ext.trim().replace('.', '').toLowerCase());
+    
+    if (!fileExtension || !validExtensions.includes(fileExtension)) {
+      const errorMsg = `Tipo de archivo no válido. Solo se permiten: ${accept}`;
+      setErrorMessage(errorMsg);
       toast({
-        title: 'Tipo de archivo no válido',
-        description: `Solo se permiten archivos: ${accept}`,
+        title: 'Archivo no válido',
+        description: errorMsg,
         variant: 'destructive',
       });
       return false;
@@ -50,9 +58,11 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
     // Validar tamaño de archivo
     const fileSize = file.size / 1024 / 1024; // convertir a MB
     if (fileSize > maxSize) {
+      const errorMsg = `El archivo es demasiado grande. Tamaño máximo: ${maxSize}MB`;
+      setErrorMessage(errorMsg);
       toast({
         title: 'Archivo demasiado grande',
-        description: `El tamaño máximo permitido es ${maxSize}MB`,
+        description: errorMsg,
         variant: 'destructive',
       });
       return false;
@@ -81,7 +91,18 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
       const selectedFile = e.target.files[0];
       if (validateFile(selectedFile)) {
         setFile(selectedFile);
+        console.log(`Archivo seleccionado: ${selectedFile.name} (${selectedFile.size} bytes, tipo: ${selectedFile.type})`);
       }
+    }
+  };
+  
+  const resetForm = () => {
+    setFile(null);
+    setUploadProgress(0);
+    setUploadStatus('idle');
+    setErrorMessage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
   
@@ -90,6 +111,7 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
     
     try {
       setUploadStatus('uploading');
+      setErrorMessage(null);
       
       // Simular progreso de carga
       const simulateProgress = () => {
@@ -109,6 +131,7 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
       const progressInterval = simulateProgress();
       
       // Procesar el archivo
+      console.log(`Iniciando carga del archivo: ${file.name}`);
       await onFileUpload(file);
       
       // Limpiar intervalo y completar progreso
@@ -118,21 +141,31 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
       
       // Reiniciar después de 2 segundos
       setTimeout(() => {
-        setFile(null);
-        setUploadProgress(0);
-        setUploadStatus('idle');
+        resetForm();
       }, 2000);
       
     } catch (error) {
       console.error('Error al cargar el archivo:', error);
       setUploadStatus('error');
       
-      // Reiniciar después de 3 segundos
+      // Manejar el mensaje de error
+      if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage('Error desconocido al procesar el archivo');
+      }
+      
+      // Mantener el mensaje de error visible durante 5 segundos
       setTimeout(() => {
         setUploadProgress(0);
         setUploadStatus('idle');
-      }, 3000);
+      }, 5000);
     }
+  };
+  
+  // Función para seleccionar otro archivo
+  const handleSelectAnother = () => {
+    resetForm();
   };
   
   return (
@@ -176,6 +209,7 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
                   Seleccionar archivo
                 </Button>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept={accept}
                   onChange={handleChange}
@@ -271,9 +305,19 @@ const FileUploader = ({ onFileUpload, isLoading, accept, maxSize = 10 }: FileUpl
               <AlertCircle className="h-8 w-8 text-red-600" />
             </div>
             <h3 className="text-lg font-semibold text-red-700">Error al procesar el archivo</h3>
-            <p className="text-sm text-red-600 mt-1">
-              Por favor, inténtalo de nuevo con otro archivo
-            </p>
+            {errorMessage && (
+              <p className="text-sm text-red-600 mt-1 mb-3">
+                {errorMessage}
+              </p>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleSelectAnother}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Seleccionar otro archivo
+            </Button>
           </motion.div>
         )}
       </div>
