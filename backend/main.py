@@ -10,6 +10,7 @@ import random
 import pandas as pd
 import io
 import uuid
+import traceback
 
 app = FastAPI()
 
@@ -39,34 +40,6 @@ class CredencialesModel(BaseModel):
 # Lista para almacenar temporalmente los datos procesados
 ultimo_dataset_procesado = []
 
-# Headers y cookies para simular un navegador real
-BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Cache-Control": "max-age=0",
-    "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Sec-Ch-Ua": '"Chromium";v="122", "Google Chrome";v="122", "Not(A:Brand";v="24"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
-    "DNT": "1"
-}
-
-# Un conjunto de cookies comunes para sitios web españoles
-DEFAULT_COOKIES = {
-    "cookiesession1": f"678B3E3{random.randint(1000, 9999)}ABCDEFGHIJKLMN",
-    "JSESSIONID": f"node01{random.randint(1000, 9999)}abc{random.randint(1000, 9999)}",
-    "consent": "true",
-    "gdpr_consent": "1",
-    "visitor_id": f"{random.randint(10000, 99999)}"
-}
-
 # Función para extraer categoría y grupo del título del Excel
 def extraer_categoria_y_grupo(titulo: str):
     # Patrones comunes en los títulos de Excel
@@ -91,20 +64,27 @@ def extraer_categoria_y_grupo(titulo: str):
 # Función para procesar archivos Excel
 def procesar_excel(file_content, file_name):
     try:
+        print(f"Iniciando procesamiento del Excel: {file_name}")
+        
         # Leer el archivo Excel
         df = pd.read_excel(io.BytesIO(file_content))
         
+        print(f"Excel leído correctamente. Forma inicial: {df.shape}")
+        
         # Eliminar filas completamente vacías
         df = df.dropna(how='all')
+        
+        print(f"Excel después de eliminar filas vacías: {df.shape}")
         
         # Detectar el título si está disponible (generalmente en las primeras filas)
         titulo = None
         for i in range(min(5, len(df))):
             for col in df.columns:
-                cell_value = str(df.iloc[i][col])
-                if any(keyword in cell_value for keyword in ["División", "Divisi", "Temporada", "Provincial"]):
-                    titulo = cell_value
-                    break
+                if pd.notna(df.iloc[i][col]):
+                    cell_value = str(df.iloc[i][col])
+                    if any(keyword in cell_value for keyword in ["División", "Divisi", "Temporada", "Provincial"]):
+                        titulo = cell_value
+                        break
             if titulo:
                 break
         
@@ -115,17 +95,24 @@ def procesar_excel(file_content, file_name):
         # Extraer categoría y grupo del título
         categoria, grupo = extraer_categoria_y_grupo(titulo)
         
-        print(f"Procesando Excel: {file_name}")
         print(f"Título detectado: {titulo}")
         print(f"Categoría: {categoria}, Grupo: {grupo}")
+        
+        # Imprimir las primeras filas para depuración
+        print("Primeras filas del Excel:")
+        for i in range(min(10, len(df))):
+            print(f"Fila {i}: {df.iloc[i].tolist()}")
         
         # Identificar las columnas relevantes
         # Buscar la fila de encabezados - generalmente después del título
         header_row_idx = None
         for i in range(min(10, len(df))):
-            row = df.iloc[i]
-            if any(col.lower() in ['jugador', 'equipo', 'goles'] for col in row.astype(str)):
+            row = df.iloc[i].astype(str)
+            row_values = row.tolist()
+            print(f"Analizando fila {i} como posible encabezado: {row_values}")
+            if any(col.lower() in str(val).lower() for val in row_values for col in ['jugador', 'equipo', 'goles']):
                 header_row_idx = i
+                print(f"¡Encabezado encontrado en fila {i}!")
                 break
         
         if header_row_idx is None:
@@ -134,8 +121,17 @@ def procesar_excel(file_content, file_name):
         
         # Usar la fila de encabezados para reiniciar el DataFrame
         headers = df.iloc[header_row_idx]
+        print(f"Encabezados encontrados: {headers.tolist()}")
+        
+        # Verificar si hay datos después del encabezado
+        if header_row_idx + 1 >= len(df):
+            print("No hay datos después de la fila de encabezados")
+            return []
+        
         df = df.iloc[header_row_idx+1:].reset_index(drop=True)
         df.columns = headers
+        
+        print(f"DataFrame después de establecer encabezados: {df.shape}")
         
         # Normalizar nombres de columnas
         column_mapping = {}
@@ -149,9 +145,12 @@ def procesar_excel(file_content, file_name):
                 column_mapping[col] = 'Partidos Jugados'
             elif 'goles' in col_lower:
                 column_mapping[col] = 'Goles'
+            elif 'grupo' in col_lower:
+                column_mapping[col] = 'Grupo'
         
         # Renombrar columnas si se encontraron mapeos
         if column_mapping:
+            print(f"Mapeo de columnas: {column_mapping}")
             df = df.rename(columns=column_mapping)
         
         # Verificar que tenemos las columnas mínimas necesarias
@@ -160,6 +159,7 @@ def procesar_excel(file_content, file_name):
         
         if missing_cols:
             print(f"Faltan columnas requeridas en el Excel: {missing_cols}")
+            print(f"Columnas disponibles: {df.columns.tolist()}")
             return []
         
         # Procesar los datos y convertirlos a objetos Jugador
@@ -172,6 +172,11 @@ def procesar_excel(file_content, file_name):
             
             nombre = str(row['Jugador']).strip()
             equipo = str(row['Equipo']).strip()
+            
+            # Extraer grupo de la fila si existe la columna, sino usar el grupo del título
+            grupo_jugador = grupo
+            if 'Grupo' in df.columns and not pd.isna(row['Grupo']):
+                grupo_jugador = str(row['Grupo']).strip()
             
             # Extraer goles, manejo de textos especiales como "25 (2 de penalti)"
             goles_raw = str(row['Goles'])
@@ -187,7 +192,7 @@ def procesar_excel(file_content, file_name):
             # Validar que tenemos datos mínimos válidos
             if len(nombre) > 2 and len(equipo) > 2:
                 # Generar ID único
-                id_jugador = f"{categoria}-{grupo}-{nombre}-{equipo}"
+                id_jugador = str(uuid.uuid4())
                 
                 # Crear objeto jugador
                 jugador = Jugador(
@@ -210,6 +215,7 @@ def procesar_excel(file_content, file_name):
     
     except Exception as e:
         print(f"Error procesando Excel: {str(e)}")
+        traceback.print_exc()
         return []
 
 @app.get("/")
@@ -237,11 +243,20 @@ async def cargar_excel(
         raise HTTPException(status_code=400, detail="El archivo debe ser un Excel (.xlsx o .xls)")
     
     try:
+        print(f"Recibido archivo: {archivo.filename}, Tamaño: {archivo.size} bytes")
+        
         # Leer el contenido del archivo
         contenido = await archivo.read()
+        print(f"Contenido leído: {len(contenido)} bytes")
         
         # Procesar el Excel
         jugadores = procesar_excel(contenido, archivo.filename)
+        
+        if not jugadores:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No se pudieron extraer jugadores del archivo {archivo.filename}. Verifica el formato del Excel."
+            )
         
         # Actualizar el dataset procesado
         global ultimo_dataset_procesado
@@ -255,6 +270,8 @@ async def cargar_excel(
         }
     
     except Exception as e:
+        print(f"Error completo al procesar el archivo: {str(e)}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error procesando el archivo: {str(e)}")
 
 @app.post("/extraer-datos")
@@ -266,10 +283,7 @@ def extraer_datos(credenciales: CredencialesModel):
     # Si tenemos datos procesados, los devolvemos
     global ultimo_dataset_procesado
     if ultimo_dataset_procesado:
-        return {
-            "jugadores": [jugador.dict() for jugador in ultimo_dataset_procesado],
-            "total": len(ultimo_dataset_procesado)
-        }
+        return [jugador.dict() for jugador in ultimo_dataset_procesado]
     
     # Si no hay datos, devolvemos un error
     raise HTTPException(
