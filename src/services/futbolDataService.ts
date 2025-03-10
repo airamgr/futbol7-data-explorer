@@ -589,7 +589,7 @@ export const cargarArchivoExcel = async (
       import('xlsx').then(XLSX => {
         // Leer el archivo
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
             if (!e.target || !e.target.result) {
               reject(new Error("Error al leer el archivo"));
@@ -628,31 +628,179 @@ export const cargarArchivoExcel = async (
             
             log(`Hojas en el libro: ${workbook.SheetNames.join(", ")}`);
             
-            // Obtener la primera hoja de cálculo
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
+            // Procesar todas las hojas del libro en busca de datos
+            let allPlayers: Jugador[] = [];
+            let sheetProcessed = false;
             
-            // Información sobre el rango de la hoja
-            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
-            log(`Rango de la hoja: ${worksheet['!ref']} (${range.e.r - range.s.r + 1} filas, ${range.e.c - range.s.c + 1} columnas)`);
+            // Intentar procesar cada hoja hasta encontrar una con datos
+            for (const sheetName of workbook.SheetNames) {
+              try {
+                log(`Intentando procesar hoja: ${sheetName}`);
+                const worksheet = workbook.Sheets[sheetName];
+                
+                // Información sobre el rango de la hoja
+                if (!worksheet['!ref']) {
+                  log(`Hoja ${sheetName} no tiene rango definido, saltando`);
+                  continue;
+                }
+                
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
+                log(`Rango de la hoja ${sheetName}: ${worksheet['!ref']} (${range.e.r - range.s.r + 1} filas, ${range.e.c - range.s.c + 1} columnas)`);
+                
+                // Verificar si la hoja tiene suficientes datos
+                if (range.e.r < 3 || range.e.c < 2) {
+                  log(`Hoja ${sheetName} no tiene suficientes datos (min 3 filas, 3 columnas), saltando`);
+                  continue;
+                }
+                
+                // Convertir a JSON con opciones más permisivas
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+                  header: 1, 
+                  defval: null,
+                  blankrows: false,
+                  rawNumbers: true
+                }) as any[][];
+                
+                log(`Datos JSON extraídos de ${sheetName}: ${jsonData.length} filas`);
+                
+                // Solo procesar si hay suficientes filas
+                if (jsonData.length < 3) {
+                  log(`Hoja ${sheetName} tiene menos de 3 filas de datos, saltando`);
+                  continue;
+                }
+                
+                // Procesar el contenido de esta hoja
+                const jugadoresHoja = procesarContenidoExcel(jsonData, debug);
+                
+                if (jugadoresHoja.length > 0) {
+                  log(`Hoja ${sheetName}: Se encontraron ${jugadoresHoja.length} jugadores`);
+                  allPlayers = [...allPlayers, ...jugadoresHoja];
+                  sheetProcessed = true;
+                } else {
+                  log(`Hoja ${sheetName}: No se encontraron jugadores`);
+                }
+              } catch (sheetError) {
+                log(`Error al procesar hoja ${sheetName}: ${sheetError instanceof Error ? sheetError.message : 'Error desconocido'}`);
+              }
+            }
             
-            // Convertir a JSON con opciones más permisivas
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-              header: 1, 
-              defval: null,
-              blankrows: false,
-              rawNumbers: true
-            }) as any[][];
+            // Si ninguna hoja tenía datos, intentemos un enfoque más agresivo para la primera hoja
+            if (allPlayers.length === 0 && workbook.SheetNames.length > 0) {
+              try {
+                const firstSheetName = workbook.SheetNames[0];
+                log(`Intentando procesamiento alternativo de la primera hoja: ${firstSheetName}`);
+                
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Intentar reconstruir la hoja desde cero
+                const cells: { [key: string]: any } = {};
+                let maxRow = 0, maxCol = 0;
+                
+                // Extraer todas las celdas manualmente
+                Object.keys(worksheet).forEach(cell => {
+                  if (cell[0] === '!') return; // Ignorar metadatos
+                  
+                  try {
+                    const ref = XLSX.utils.decode_cell(cell);
+                    maxRow = Math.max(maxRow, ref.r);
+                    maxCol = Math.max(maxCol, ref.c);
+                    
+                    // Agregar celda a nuestra estructura
+                    cells[cell] = worksheet[cell].v || worksheet[cell].w || '';
+                  } catch (e) {
+                    // Ignorar errores en celdas específicas
+                  }
+                });
+                
+                log(`Celdas extraídas manualmente: ${Object.keys(cells).length} (max row: ${maxRow}, max col: ${maxCol})`);
+                
+                // Si tenemos suficientes celdas, construir array 2D
+                if (Object.keys(cells).length > 5 && maxRow >= 2 && maxCol >= 2) {
+                  const data: any[][] = Array(maxRow + 1).fill(0).map(() => Array(maxCol + 1).fill(null));
+                  
+                  // Llenar el array con datos
+                  Object.keys(cells).forEach(cell => {
+                    try {
+                      const ref = XLSX.utils.decode_cell(cell);
+                      data[ref.r][ref.c] = cells[cell];
+                    } catch (e) {
+                      // Ignorar errores
+                    }
+                  });
+                  
+                  log(`Array 2D construido manualmente: ${data.length} filas`);
+                  
+                  // Procesar estos datos
+                  const jugadoresAlternativos = procesarContenidoExcel(data, debug);
+                  
+                  if (jugadoresAlternativos.length > 0) {
+                    log(`Procesamiento alternativo: Se encontraron ${jugadoresAlternativos.length} jugadores`);
+                    allPlayers = [...allPlayers, ...jugadoresAlternativos];
+                    sheetProcessed = true;
+                  }
+                }
+              } catch (altError) {
+                log(`Error en procesamiento alternativo: ${altError instanceof Error ? altError.message : 'Error desconocido'}`);
+              }
+            }
             
-            log(`Datos JSON extraídos: ${jsonData.length} filas`);
+            // Verificar si pudimos procesar alguna hoja
+            if (!sheetProcessed) {
+              log("No se pudo procesar ninguna hoja del libro Excel");
+              
+              // Intenta usar el backend si está disponible (como fallback)
+              try {
+                log("Intentando usar el backend como fallback...");
+                
+                const formData = new FormData();
+                formData.append('archivo', file);
+                formData.append('username', auth.username);
+                formData.append('password', auth.password);
+                
+                // Detectar si estamos en desarrollo o producción
+                const backendUrl = window.location.hostname.includes('localhost') 
+                  ? 'http://localhost:8000/cargar-excel'
+                  : '/api/cargar-excel';
+                
+                log(`Enviando archivo al backend: ${backendUrl}`);
+                
+                const response = await fetch(backendUrl, {
+                  method: 'POST',
+                  body: formData
+                });
+                
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  log(`Backend respondió con error: ${response.status} - ${errorText}`);
+                  reject(new Error("No se pudieron extraer datos del archivo. Verifica que contenga columnas de jugador, equipo y goles."));
+                  return;
+                }
+                
+                const result = await response.json();
+                
+                if (result.jugadores && Array.isArray(result.jugadores) && result.jugadores.length > 0) {
+                  log(`Backend extrajo ${result.jugadores.length} jugadores`);
+                  resolve(result.jugadores);
+                  return;
+                } else {
+                  log("El backend no pudo extraer jugadores");
+                  reject(new Error("No se pudieron extraer datos del archivo. Verifica que contenga columnas de jugador, equipo y goles."));
+                  return;
+                }
+                
+              } catch (backendError) {
+                log(`Error al usar backend: ${backendError instanceof Error ? backendError.message : 'Error desconocido'}`);
+                reject(new Error("No se pudieron extraer datos del archivo. Verifica que contenga columnas de jugador, equipo y goles."));
+                return;
+              }
+            }
             
-            // Procesar el contenido
-            const jugadores = procesarContenidoExcel(jsonData, debug);
-            
-            if (jugadores.length === 0) {
-              reject(new Error("No se pudieron extraer datos del archivo. Verifique que contenga columnas de jugador, equipo y goles."));
+            if (allPlayers.length === 0) {
+              reject(new Error("No se pudieron extraer datos del archivo. Verifica que contenga columnas de jugador, equipo y goles."));
             } else {
-              resolve(jugadores);
+              // Ordenar por goles (mayor a menor)
+              allPlayers.sort((a, b) => b.goles - a.goles);
+              resolve(allPlayers);
             }
           } catch (error) {
             log(`Error al procesar el Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);

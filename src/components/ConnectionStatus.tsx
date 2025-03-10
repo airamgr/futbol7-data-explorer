@@ -40,15 +40,15 @@ const ConnectionStatus = ({ error, debugInfo }: ConnectionStatusProps) => {
               <FileSpreadsheet className="h-4 w-4 mr-1" />
               Error al procesar el archivo Excel
             </p>
-            <p className="text-xs mt-1">
-              Posibles causas:
+            <div className="text-xs mt-1">
+              <p>Posibles causas:</p>
               <ul className="list-disc pl-5 mt-1">
                 <li>Formato incorrecto del archivo</li>
                 <li>Estructura de datos no reconocida</li>
                 <li>Las columnas de jugador, equipo o goles no fueron detectadas</li>
                 <li>Archivo dañado o corrupto</li>
               </ul>
-            </p>
+            </div>
             <p className="text-xs mt-2">
               Intenta con otro archivo Excel que contenga columnas con nombres "Jugador", "Equipo" y "Goles". 
               O prueba guardarlo como .xlsx usando "Guardar como" en Excel.

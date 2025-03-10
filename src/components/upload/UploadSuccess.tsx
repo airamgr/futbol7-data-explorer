@@ -1,6 +1,7 @@
 
 import { CheckCircle, FileSpreadsheet } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
 
 interface UploadSuccessProps {
   count?: number;
@@ -34,12 +35,16 @@ const UploadSuccess = ({ count, fileType }: UploadSuccessProps) => {
               <FileSpreadsheet className="h-4 w-4 mr-1" />
               Consejos para Excel:
             </p>
-            <ul className="text-xs list-disc pl-5 mt-1 text-left">
-              <li>Verifica que el Excel contenga columnas para Jugador, Equipo y Goles</li>
-              <li>Las columnas deben tener datos en al menos 2-3 filas para ser detectadas</li>
-              <li>Guarda el archivo en formato .xlsx usando "Guardar como" en Excel</li>
-              <li>Asegúrate que la primera hoja del libro contenga los datos</li>
-            </ul>
+            <div className="text-xs mt-1 text-left">
+              <p className="mb-1">Asegúrate que:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>El Excel contenga columnas para Jugador, Equipo y Goles</li>
+                <li>Las columnas tengan datos en al menos 2-3 filas</li>
+                <li>Intenta guardar como .xlsx desde Excel (Archivo → Guardar como)</li>
+                <li>Verifica que los datos estén en alguna de las hojas del archivo</li>
+                <li>Si el archivo es antiguo, intenta abrirlo en Excel y guardarlo nuevamente</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}
