@@ -40,7 +40,8 @@ export const TablaJugadores = ({ jugadores, isLoading }: TablaJugadoresProps) =>
         (jugador) =>
           jugador.nombre.toLowerCase().includes(termLower) ||
           jugador.equipo.toLowerCase().includes(termLower) ||
-          jugador.categoria.toLowerCase().includes(termLower)
+          jugador.categoria.toLowerCase().includes(termLower) ||
+          (jugador.grupo && jugador.grupo.toLowerCase().includes(termLower))
       );
     }
 
@@ -118,7 +119,7 @@ export const TablaJugadores = ({ jugadores, isLoading }: TablaJugadoresProps) =>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
         <Input
-          placeholder="Buscar jugador, equipo, categoría..."
+          placeholder="Buscar jugador, equipo, grupo, categoría..."
           className="pl-10"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -148,6 +149,14 @@ export const TablaJugadores = ({ jugadores, isLoading }: TablaJugadoresProps) =>
               </TableHead>
               <TableHead 
                 className="cursor-pointer hover:bg-primary/5 transition-colors"
+                onClick={() => handleSort('grupo')}
+              >
+                <div className="flex items-center">
+                  Grupo {renderSortIcon('grupo')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-primary/5 transition-colors"
                 onClick={() => handleSort('categoria')}
               >
                 <div className="flex items-center">
@@ -172,6 +181,14 @@ export const TablaJugadores = ({ jugadores, isLoading }: TablaJugadoresProps) =>
               </TableHead>
               <TableHead 
                 className="cursor-pointer hover:bg-primary/5 transition-colors text-right"
+                onClick={() => handleSort('golesPartido')}
+              >
+                <div className="flex items-center justify-end">
+                  Goles/P {renderSortIcon('golesPartido')}
+                </div>
+              </TableHead>
+              <TableHead 
+                className="cursor-pointer hover:bg-primary/5 transition-colors text-right"
                 onClick={() => handleSort('fechaNacimiento')}
               >
                 <div className="flex items-center justify-end">
@@ -186,7 +203,7 @@ export const TablaJugadores = ({ jugadores, isLoading }: TablaJugadoresProps) =>
                 // Filas de carga
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={`skeleton-${index}`}>
-                    {Array.from({ length: 6 }).map((_, cellIndex) => (
+                    {Array.from({ length: 8 }).map((_, cellIndex) => (
                       <TableCell key={`skeleton-cell-${index}-${cellIndex}`}>
                         <motion.div
                           className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
@@ -214,15 +231,17 @@ export const TablaJugadores = ({ jugadores, isLoading }: TablaJugadoresProps) =>
                   >
                     <TableCell className="font-medium">{jugador.nombre}</TableCell>
                     <TableCell>{jugador.equipo}</TableCell>
+                    <TableCell>{jugador.grupo || 'N/A'}</TableCell>
                     <TableCell>{jugador.categoria}</TableCell>
                     <TableCell className="text-right font-semibold">{jugador.goles}</TableCell>
                     <TableCell className="text-right">{jugador.partidosJugados || 'N/A'}</TableCell>
+                    <TableCell className="text-right">{jugador.golesPartido?.toFixed(2) || 'N/A'}</TableCell>
                     <TableCell className="text-right">{calcularEdad(jugador.fechaNacimiento)}</TableCell>
                   </motion.tr>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <motion.div
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
