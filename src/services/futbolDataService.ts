@@ -1,4 +1,4 @@
-<lov-code>
+
 // Definimos los tipos de datos
 export interface Jugador {
   id: string;
@@ -22,6 +22,54 @@ export interface FiltroJugadores {
   partidosMinimos?: number;
   grupo?: string;
 }
+
+// Función para filtrar jugadores
+export const filtrarJugadores = (jugadores: Jugador[], filtros: FiltroJugadores): Jugador[] => {
+  return jugadores.filter(jugador => {
+    // Filtrar por categoría
+    if (filtros.categoria && jugador.categoria !== filtros.categoria) {
+      return false;
+    }
+    
+    // Filtrar por equipo
+    if (filtros.equipo && jugador.equipo !== filtros.equipo) {
+      return false;
+    }
+    
+    // Filtrar por edad (si hay fecha de nacimiento)
+    if ((filtros.edadMinima !== undefined || filtros.edadMaxima !== undefined) && jugador.fechaNacimiento) {
+      const fechaNacimiento = new Date(jugador.fechaNacimiento);
+      const hoy = new Date();
+      const edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+      
+      if (filtros.edadMinima !== undefined && edad < filtros.edadMinima) {
+        return false;
+      }
+      
+      if (filtros.edadMaxima !== undefined && edad > filtros.edadMaxima) {
+        return false;
+      }
+    }
+    
+    // Filtrar por goles mínimos
+    if (filtros.golesMinimos !== undefined && jugador.goles < filtros.golesMinimos) {
+      return false;
+    }
+    
+    // Filtrar por partidos mínimos
+    if (filtros.partidosMinimos !== undefined && 
+        (jugador.partidosJugados === undefined || jugador.partidosJugados < filtros.partidosMinimos)) {
+      return false;
+    }
+    
+    // Filtrar por grupo
+    if (filtros.grupo && jugador.grupo !== filtros.grupo) {
+      return false;
+    }
+    
+    return true;
+  });
+};
 
 // Función para extraer título y categoría del Excel
 const extraerCategoriaYGrupo = (contenido: any[][]): { categoria: string; grupo: string } => {
@@ -752,4 +800,120 @@ export const cargarArchivoExcel = async (
             const data = new Uint8Array(e.target.result as ArrayBuffer);
             
             // Try with different read options
-            let workbook
+            let workbook;
+            try {
+              workbook = XLSX.read(data, { type: 'array' });
+              log("Excel leído con opciones estándar");
+            } catch (e) {
+              log("Error leyendo Excel con opciones estándar, intentando con formato XLS");
+              try {
+                // Try with XLS format specifically
+                workbook = XLSX.read(data, { type: 'array', cellDates: true, cellNF: true, cellStyles: true });
+                log("Excel leído con opciones específicas para XLS");
+              } catch (e2) {
+                reject(new Error("Formato de archivo no reconocido o archivo dañado"));
+                return;
+              }
+            }
+            
+            // Log sheet names for debugging
+            log(`Hojas en el libro: ${workbook.SheetNames.join(', ')}`);
+            
+            // Try all sheets until we find a valid one with data
+            let sheetData: any[][] = [];
+            let processedJugadores: Jugador[] = [];
+            
+            // First try the first sheet with the standard processor
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            if (firstSheet) {
+              const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
+              log(`Rango de la hoja: ${firstSheet['!ref']} (${range.e.r + 1} filas, ${range.e.c + 1} columnas)`);
+              
+              // Convert to JSON
+              sheetData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+              log(`Datos JSON extraídos: ${sheetData.length} filas`);
+              
+              // Try first with the standard format processor
+              processedJugadores = procesarExcelEstandar(sheetData, debug);
+              
+              // If we got players, return them
+              if (processedJugadores.length > 0) {
+                log(`Datos procesados correctamente con formato estándar: ${processedJugadores.length} jugadores`);
+                resolve(processedJugadores);
+                return;
+              }
+              
+              // If not, try with the general processor
+              log("Formato estándar no funcionó, intentando con procesador general");
+              processedJugadores = procesarContenidoExcel(sheetData, debug);
+              
+              // If we got players, return them
+              if (processedJugadores.length > 0) {
+                log(`Datos procesados correctamente con formato general: ${processedJugadores.length} jugadores`);
+                resolve(processedJugadores);
+                return;
+              }
+            }
+            
+            // If no players found in the first sheet, try other sheets
+            for (let i = 1; i < workbook.SheetNames.length; i++) {
+              const sheet = workbook.Sheets[workbook.SheetNames[i]];
+              if (sheet) {
+                log(`Intentando procesar hoja: ${workbook.SheetNames[i]}`);
+                
+                // Convert to JSON
+                sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                
+                // Try with both processors
+                processedJugadores = procesarExcelEstandar(sheetData, debug);
+                if (processedJugadores.length > 0) {
+                  log(`Datos procesados correctamente con formato estándar en hoja ${workbook.SheetNames[i]}: ${processedJugadores.length} jugadores`);
+                  resolve(processedJugadores);
+                  return;
+                }
+                
+                processedJugadores = procesarContenidoExcel(sheetData, debug);
+                if (processedJugadores.length > 0) {
+                  log(`Datos procesados correctamente con formato general en hoja ${workbook.SheetNames[i]}: ${processedJugadores.length} jugadores`);
+                  resolve(processedJugadores);
+                  return;
+                }
+              }
+            }
+            
+            // If we get here, no valid data was found
+            reject(new Error("No se pudieron extraer datos del archivo. Verifique que contenga columnas de jugador, equipo y goles."));
+          } catch (error) {
+            console.error("Error procesando Excel:", error);
+            let errorMsg = "Error al procesar el archivo Excel";
+            
+            if (error instanceof Error) {
+              errorMsg = error.message;
+            }
+            
+            reject(new Error(errorMsg));
+          }
+        };
+        
+        reader.onerror = () => {
+          reject(new Error("Error al leer el archivo"));
+        };
+        
+        // Start reading the file
+        reader.readAsArrayBuffer(file);
+      }).catch(error => {
+        console.error("Error cargando librería XLSX:", error);
+        reject(new Error("Error cargando la librería para procesar Excel"));
+      });
+    } catch (error) {
+      console.error("Error general:", error);
+      let errorMsg = "Error inesperado al procesar el archivo";
+      
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      }
+      
+      reject(new Error(errorMsg));
+    }
+  });
+};
