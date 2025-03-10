@@ -88,6 +88,7 @@ export const usePlayerData = (auth: { username: string; password: string } | nul
     }
   };
 
+  // Función para cargar datos (placeholder)
   const cargarDatos = async () => {
     if (!auth) {
       setError('Se requiere autenticación para cargar datos');
